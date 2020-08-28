@@ -14,7 +14,7 @@ package cilility_jnh;
 * See the GNU General Public License for more details.
 *  
 * Copyright (C) Jan Niklas Hansen
-* Date: February 14, 2018 (This Version: August 28, 2020)
+* Date: June 13, 2019 (This Version: August 28, 2020)
 *   
 * For any questions please feel free to contact me (jan.hansen@uni-bonn.de).
 * =============================================================================== */
