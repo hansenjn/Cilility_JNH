@@ -3,23 +3,33 @@
 	<modelVersion>4.0.0</modelVersion>
   
 	<parent>
-		<groupId>sc.fiji</groupId>
-		<artifactId>pom-fiji</artifactId>
-		<version>17.0.0</version>
+		<groupId>org.scijava</groupId>
+		<artifactId>pom-scijava</artifactId>
+		<version>17.1.1</version>
 		<relativePath />
 	</parent> 
  
- 	<artifactId>Cilility_JNH</artifactId>
+ 	<artifactId>Cilility_JNH</artifactId>  
  	<groupId>JNH</groupId>
     <version>0.1.1-SNAPSHOT</version>
  
 <!-- Plugin Information -->
- 	<url>https://github.com/hansenjn/</url>
+    <name>Cilility</name>
+ 	<description>Analyze ciliary beating</description>    
+ 	<url>https://github.com/hansenjn/Cilility_JNH</url>
 	<inceptionYear>2019</inceptionYear>
 	<organization>
 		<name>JNH</name>
 		<url>https://github.com/hansenjn</url>
-	</organization>
+	</organization>	
+	
+ 	<properties>
+		<main-class>CililityMain</main-class>
+		<package-name>cilility_jnh</package-name>
+		<license.licenseName>gpl_v3</license.licenseName>
+		<license.copyrightOwners>Jan Niklas Hansen.</license.copyrightOwners>
+		<license.projectName>Cilility_JNH</license.projectName>
+	</properties>
 		
 	<licenses>
 		<license>
@@ -33,7 +43,7 @@
         <developer>
             <id></id>
             <name>Jan Niklas Hansen</name>
-            <email>jan.hansen@caesar.de</email>
+            <email>jan.hansen@uni-bonn.de</email>
             <url>r</url>
             <organization></organization>
             <organizationUrl></organizationUrl>
@@ -65,36 +75,21 @@
 		</mailingList>
 	</mailingLists>
  	
-<!--  	<scm> -->
-<!-- 		<connection>scm:git:git://github.com/hansenjn/MotiQ/3D Analyzer</connection> -->
-<!-- 		<developerConnection>scm:git:git@github.com:hansenjn/MotiQ/3D Analyzer</developerConnection> -->
-<!-- 		<tag>HEAD</tag> -->
-<!-- 		<url>https://github.com/hansenjn/MotiQ/3D Analyzer</url> -->
-<!-- 	</scm> -->
+ 	<scm>
+		<connection>scm:git:git://github.com/hansenjn/Cilility_JNH</connection>
+		<developerConnection>scm:git:git@github.com:hansenjn/Cilility_JNH</developerConnection>
+		<tag>HEAD</tag>
+		<url>https://github.com/hansenjn/Cilility_JNH</url>
+	</scm>
  	
  	<issueManagement>
 		<system>GitHub Issues</system>
-		<url>https://github.com/hansenjn/MotiQ/issues</url>
+		<url>https://github.com/hansenjn/Cilility_JNH/issues</url>
 	</issueManagement>
  	
  	<ciManagement>
 		<system>None</system>
 	</ciManagement>
- 	
- 	<properties>
-		<main-class>Main</main-class>
-		<package-name>cilility_jnh</package-name>
-		<license.licenseName>gpl_v3</license.licenseName>
-		<license.copyrightOwners>Jan Niklas Hansen.</license.copyrightOwners>
-		<license.projectName>CililityJNH</license.projectName>
-	</properties>
- 	
- 	<repositories>
-    	<repository>
-            <id>imagej.public</id>
-            <url>http://maven.imagej.net/content/groups/public</url>
-        </repository>
-    </repositories>
  
 <!-- TODO: See Optional Dependencies section -->
     <dependencies>
@@ -102,15 +97,7 @@
         <dependency>
             <groupId>net.imagej</groupId>
             <artifactId>ij</artifactId>
-        </dependency>        
-<!--         <dependency> -->
-<!--             <groupId>sc.fiji</groupId> -->
-<!--   			<artifactId>AnalyzeSkeleton_</artifactId> -->
-<!--         </dependency>	 -->
-<!--         <dependency> -->
-<!--             <groupId>sc.fiji</groupId> -->
-<!--   			<artifactId>Skeletonize3D_</artifactId> -->
-<!--         </dependency>	 -->
+        </dependency>
     </dependencies>  
     
     <build>
@@ -142,10 +129,6 @@
 					</archive>
 				</configuration>
 			</plugin>
-			
-
 		</plugins>
-	</build>  
-    <name>Cilility</name>
-    <description>Crops image to a predefined ROI</description>
+	</build>
 </project>
