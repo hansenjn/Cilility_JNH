@@ -54,6 +54,8 @@ public class CililityMain implements PlugIn, Measurements {
 	static SimpleDateFormat FullDateFormatter = new SimpleDateFormat("yyyy-MM-dd	HH:mm:ss");
 	static SimpleDateFormat FullDateFormatter2 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 	
+	static DecimalFormat df1US = new DecimalFormat("#0.0");
+	
 	//Progress Dialog
 	ProgressDialog progress;	
 	boolean processingDone = false;	
@@ -79,6 +81,8 @@ public class CililityMain implements PlugIn, Measurements {
 //		enum channelType {PLAQUE,CELL,NEURITE};
 	
 public void run(String arg) {
+	df1US.setDecimalFormatSymbols(new DecimalFormatSymbols(Locale.US));;
+	
 //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 //-------------------------GenericDialog--------------------------------------
 //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
@@ -248,6 +252,40 @@ public void run(String arg) {
 	}
 	
 	
+   	//Initialize
+   	double [][][] phaseMapRoiFreqs;
+	double [][][] phaseMapWholeImpFreqs;
+	double [] locFreqs;
+	double rawFreqRes [][][]; 
+   	double valueColumn [];
+   	double lowerPowerAvgSD [];
+   	boolean signal [][];
+   	double [][] powerSpectrumBackground;
+	double corrFreqRes [][][]; 
+   	boolean signalPostCorr [][];
+	double [] assembledPowerSpectrumFromRoi;
+   	double [] assembledPowerSpectrumFromRoiCorr;
+   	int [] roiFreqs;
+   	double [] roiAmpl;
+   	double [] roiCorrAmpl;
+	double [] roiCorrSharp;  
+	double roiCom;
+	double ctr;
+	double [] assembledPowerSpectrumFromWholeImp;
+ 	double [] assembledPowerSpectrumFromWholeImpCorr;
+	int [] wholeImpFreqs;
+   	double [] wholeImpAmpl;
+   	double [] wholeImpCorrAmpl;
+   	double [] wholeImpCorrSharp;
+    double wholeImpCom;
+
+	TextPanel tp1, tp2, tp3;
+
+	double [] xValues;
+	double [][] yValues;
+
+	String filePrefix;
+	
 	for(int task = 0; task < tasks; task++){
 		running: while(continueProcessing){
 			Date startDate = new Date();
@@ -284,649 +322,697 @@ public void run(String arg) {
 			}
 		   	//open Image
 		   	
-		/******************************************************************
-		*** 						Processing							***	
-		*******************************************************************/
-		   	//initialize
-		   	if(smoothFreq != 0.0){
-		   		smoothWindowSize = (int)(smoothFreq / (sampleRate/(double)imp.getStackSize()));
-			   	if(smoothWindowSize%2==0)	smoothWindowSize++;
-			   	progress.notifyMessage("smoothWindowSize = " + smoothWindowSize, ProgressDialog.LOG);
-		   	}else{
-		   		smoothWindowSize = 0;
-		   	}
-		   
-		   	
-		   	
-		   	double rawFreqRes [][][] = new double [imp.getWidth()][imp.getHeight()][5]; 
-		   	double valueColumn [] = new double [imp.getStackSize()];
-		   	for(int x = 0; x < imp.getWidth(); x++){
-		   		progress.addToBar(0.4/(double)imp.getWidth());
-		   		for(int y = 0; y < imp.getHeight(); y++){
-		   			for(int i = 0; i < imp.getStackSize(); i++){
-		   				valueColumn [i] = imp.getStack().getVoxel(x, y, i);
-		   			}
-		   			rawFreqRes[x][y] = getFrequenciesWithPowerAndPhase(valueColumn, sampleRate, false, true, smoothWindowSize, lowerLimit, upperLimit);
-			   	}	
-		   	}
-		   	
-//		   	boolean signal [][] = getSignalRegionsBySD(output, 3.0);
-		   	double lowerPowerAvgSD [] = getAvgSDOfLowerPowers(rawFreqRes, percentLowest);
-		   	boolean signal [][] = getSignalRegionsByPowerThreshold(rawFreqRes, lowerPowerAvgSD[0] + limitSD * lowerPowerAvgSD[1]);
-		   	
-		   	double [][] powerSpectrumBackground = getPowerSpectraBackground(imp, signal, smoothWindowSize);
-//		   	double [] powerSpectrumMinimum = getPowerSpectraMinima(imp, smoothWindowSize);
-		   			   			   	
-			double corrFreqRes [][][] = new double [imp.getWidth()][imp.getHeight()][5]; 
-		   	for(int x = 0; x < imp.getWidth(); x++){
-		   		progress.addToBar(0.4/(double)imp.getWidth());
-		   		for(int y = 0; y < imp.getHeight(); y++){
-		   			for(int i = 0; i < imp.getStackSize(); i++){
-		   				valueColumn [i] = imp.getStack().getVoxel(x, y, i);
-		   			}
-		   			corrFreqRes[x][y] = getSignificantFrequenciesWithPowersAndPhases(valueColumn, sampleRate, false, true, powerSpectrumBackground, limitSD, lowerLimit, upperLimit, smoothWindowSize);
-//		   			outputCorr[x][y] = getAboveMinimumFrequenciesWithPowers(valueColumn, sampleRate, false, true, powerSpectrumMinimum, lowerLimit, upperLimit);
-			   	}	
-		   	}
-		   	
-		   	boolean signalPostCorr [][] = getSignalRegionsBySD(corrFreqRes, 3.0);
-//		   	boolean signalPostCorr [][] = signal;
-		   	int signalPixels = 0;
-		   	for(int x = 0; x < imp.getWidth(); x++){
-		   		progress.addToBar(0.1/(double)imp.getWidth());
-		   		for(int y = 0; y < imp.getHeight(); y++){
-		   			if(!signalPostCorr[x][y]){
-		   				for(int i = 0; i < corrFreqRes[x][y].length; i++){
-		   					corrFreqRes[x][y][i] = 0.0;
-		   				}		   				
-		   			}else if(selections[task].contains(x, y)){
-		   				if(corrFreqRes[x][y][0]>=lowerLimit && corrFreqRes[x][y][0]<=upperLimit){
-		   					signalPixels++;
-		   				}		   				
-		   			}		   			
-			   	}	
-		   	}
-		   	
-		   	//DETERMINE PARAMETERS FOR SELECTION
-		   	double roiMin = Double.POSITIVE_INFINITY, roiMax = Double.NEGATIVE_INFINITY, roiAverage, roiSD;
-		   	valueColumn = new double [signalPixels];
-		   	signalPixels = 0;
-		   	int valueCounter = 0;
-		   	for(int x = 0; x < imp.getWidth(); x++){
-		   		progress.addToBar(0.05/(double)imp.getWidth());
-		   		for(int y = 0; y < imp.getHeight(); y++){
-		   			if(signalPostCorr[x][y] && selections[task].contains(x, y)){
-		   				if(roiMin > corrFreqRes[x][y][0] && corrFreqRes[x][y][0] != -1){
-		   					roiMin = corrFreqRes[x][y][0];
-		   				}
-		   				if(roiMax < corrFreqRes[x][y][0]){
-		   					roiMax = corrFreqRes[x][y][0];
-		   				}
-		   				if(corrFreqRes[x][y][0]>=lowerLimit && corrFreqRes[x][y][0]<=upperLimit){
-		   					valueColumn [valueCounter] = corrFreqRes[x][y][0];
-			   				valueCounter++;
-			   				signalPixels++;
-		   				}		   				
-		   			}else if(signalPostCorr[x][y]){
-		   				if(corrFreqRes[x][y][0]>=lowerLimit && corrFreqRes[x][y][0]<=upperLimit){
-		   					signalPixels++;
-		   				}
-		   			}
-			   	}	
-		   	}		   	
-		   	if(valueCounter != valueColumn.length){
-		   		IJ.log("ERROR IN CODE!!!");
-		   	}
-		   	roiAverage = tools.getAverage(valueColumn);
-		   	roiSD = tools.getSD(valueColumn);
-		   	
-		  //DETERMINE PARAMETERS FOR ENTIRE IMAGE
-		   	double wholeImpMin = Double.POSITIVE_INFINITY, wholeImpMax = Double.NEGATIVE_INFINITY, wholeImpAverage, wholeImpSD;
-		   	valueColumn = new double [signalPixels];
-		   	valueCounter = 0;
-		   	for(int x = 0; x < imp.getWidth(); x++){
-		   		progress.addToBar(0.05/(double)imp.getWidth());
-		   		for(int y = 0; y < imp.getHeight(); y++){
-		   			if(signalPostCorr[x][y]){
-		   				if(wholeImpMin > corrFreqRes[x][y][0] && corrFreqRes[x][y][0] != -1){
-		   					wholeImpMin = corrFreqRes[x][y][0];
-		   				}
-		   				if(wholeImpMax < corrFreqRes[x][y][0]){
-		   					wholeImpMax = corrFreqRes[x][y][0];
-		   				}
-		   				if(corrFreqRes[x][y][0]>=lowerLimit && corrFreqRes[x][y][0]<=upperLimit){
-		   					valueColumn [valueCounter] = corrFreqRes[x][y][0];
-			   				valueCounter++;
-		   				}		   				
-		   			}		   			
-			   	}	
-		   	}		   	
-		   	if(valueCounter != valueColumn.length){
-		   		IJ.log("ERROR IN CODE - 2!!!");
-		   	}
-		   	wholeImpAverage = tools.getAverage(valueColumn);
-		   	wholeImpSD = tools.getSD(valueColumn);
-		   	
-		   	//DETERMINE POWER SPECTRUM IN ROI
-		   	double [] assembledPowerSpectrumFromRoi = getAssembledPowerSpectrumInRoi(imp, signalPostCorr, selections[task], smoothWindowSize);
-		   	double [] assembledPowerSpectrumFromRoiCorr = new double [0];
-		   	int [] roiFreqs = new int [2];
-		   	double [] roiAmpl = new double [2];
-		   	double [] roiCorrAmpl = new double [2];
-			double [] roiCorrSharp = new double [2];  
-			double roiCom = 0.0;
-			double ctr = 0;
-		   	
-		   	if(assembledPowerSpectrumFromRoi != null){
-		   		assembledPowerSpectrumFromRoiCorr = new double [assembledPowerSpectrumFromRoi.length];
-		   		for(int i = 0; i < assembledPowerSpectrumFromRoi.length; i++){
-			   		assembledPowerSpectrumFromRoiCorr [i] = assembledPowerSpectrumFromRoi [i] - powerSpectrumBackground [0][i] - limitSD * powerSpectrumBackground [1][i];
-//			   		assembledPowerSpectrumFromRoiCorr [i] = assembledPowerSpectrumFromRoi [i] - powerSpectrumMinimum [i];
-			   		if(assembledPowerSpectrumFromRoiCorr [i] < 0.0){
-			   			assembledPowerSpectrumFromRoiCorr [i] = 0.0;
-			   		}
+			try {   	
+			/******************************************************************
+			*** 						Processing							***	
+			*******************************************************************/
+			   	//initialize
+			   	if(smoothFreq != 0.0){
+			   		smoothWindowSize = (int)(smoothFreq / (sampleRate/(double)imp.getStackSize()));
+				   	if(smoothWindowSize%2==0)	smoothWindowSize++;
+				   	progress.notifyMessage("smoothWindowSize = " + smoothWindowSize, ProgressDialog.LOG);
+			   	}else{
+			   		smoothWindowSize = 0;
+			   	}
+			   
+			   	
+			   	
+			   	rawFreqRes = new double [imp.getWidth()][imp.getHeight()][5]; 
+			   	valueColumn = new double [imp.getStackSize()];
+			   	for(int x = 0; x < imp.getWidth(); x++){
+			   		progress.addToBar(0.3/(double)imp.getWidth());
+			   		for(int y = 0; y < imp.getHeight(); y++){
+			   			for(int i = 0; i < imp.getStackSize(); i++){
+			   				valueColumn [i] = imp.getStack().getVoxel(x, y, i);
+			   			}
+			   			rawFreqRes[x][y] = getFrequenciesWithPowerAndPhase(valueColumn, sampleRate, false, true, smoothWindowSize, lowerLimit, upperLimit);
+				   	}	
 			   	}
 			   	
-			   	roiFreqs = tools.get2HighestMaximaIndicesWithinRange(assembledPowerSpectrumFromRoiCorr, 
-			   			(int)Math.round(lowerLimit*(assembledPowerSpectrumFromRoiCorr.length/sampleRate)), 
-			   			(int)Math.round(upperLimit*(assembledPowerSpectrumFromRoiCorr.length/sampleRate)));
+	//		   	boolean signal [][] = getSignalRegionsBySD(output, 3.0);
+			   	lowerPowerAvgSD = getAvgSDOfLowerPowers(rawFreqRes, percentLowest);
+			   	signal = getSignalRegionsByPowerThreshold(rawFreqRes, lowerPowerAvgSD[0] + limitSD * lowerPowerAvgSD[1]);
+			   	
+			   	powerSpectrumBackground = getPowerSpectraBackground(imp, signal, smoothWindowSize);
+	//		   	double [] powerSpectrumMinimum = getPowerSpectraMinima(imp, smoothWindowSize);
+			   			   			   	
+				corrFreqRes = new double [imp.getWidth()][imp.getHeight()][5]; 
+			   	for(int x = 0; x < imp.getWidth(); x++){
+			   		progress.addToBar(0.3/(double)imp.getWidth());
+			   		for(int y = 0; y < imp.getHeight(); y++){
+			   			for(int i = 0; i < imp.getStackSize(); i++){
+			   				valueColumn [i] = imp.getStack().getVoxel(x, y, i);
+			   			}
+			   			corrFreqRes[x][y] = getSignificantFrequenciesWithPowersAndPhases(valueColumn, sampleRate, false, true, powerSpectrumBackground, limitSD, lowerLimit, upperLimit, smoothWindowSize);
+	//		   			outputCorr[x][y] = getAboveMinimumFrequenciesWithPowers(valueColumn, sampleRate, false, true, powerSpectrumMinimum, lowerLimit, upperLimit);
+				   	}	
+			   	}
+			   	
+			   	signalPostCorr = getSignalRegionsBySD(corrFreqRes, 3.0);
+	//		   	boolean signalPostCorr [][] = signal;
+			   	int signalPixels = 0;
+			   	for(int x = 0; x < imp.getWidth(); x++){
+			   		progress.addToBar(0.05/(double)imp.getWidth());
+			   		for(int y = 0; y < imp.getHeight(); y++){
+			   			if(!signalPostCorr[x][y]){
+			   				for(int i = 0; i < corrFreqRes[x][y].length; i++){
+			   					corrFreqRes[x][y][i] = 0.0;
+			   				}		   				
+			   			}else if(selections[task].contains(x, y)){
+			   				if(corrFreqRes[x][y][0]>=lowerLimit && corrFreqRes[x][y][0]<=upperLimit){
+			   					signalPixels++;
+			   				}		   				
+			   			}		   			
+				   	}	
+			   	}
+			   	
+			   	//DETERMINE PARAMETERS FOR SELECTION
+			   	double roiMin = Double.POSITIVE_INFINITY, roiMax = Double.NEGATIVE_INFINITY, roiAverage, roiSD;
+			   	valueColumn = new double [signalPixels];
+			   	signalPixels = 0;
+			   	int valueCounter = 0;
+			   	for(int x = 0; x < imp.getWidth(); x++){
+			   		progress.addToBar(0.05/(double)imp.getWidth());
+			   		for(int y = 0; y < imp.getHeight(); y++){
+			   			if(signalPostCorr[x][y] && selections[task].contains(x, y)){
+			   				if(roiMin > corrFreqRes[x][y][0] && corrFreqRes[x][y][0] != -1){
+			   					roiMin = corrFreqRes[x][y][0];
+			   				}
+			   				if(roiMax < corrFreqRes[x][y][0]){
+			   					roiMax = corrFreqRes[x][y][0];
+			   				}
+			   				if(corrFreqRes[x][y][0]>=lowerLimit && corrFreqRes[x][y][0]<=upperLimit){
+			   					valueColumn [valueCounter] = corrFreqRes[x][y][0];
+				   				valueCounter++;
+				   				signalPixels++;
+			   				}		   				
+			   			}else if(signalPostCorr[x][y]){
+			   				if(corrFreqRes[x][y][0]>=lowerLimit && corrFreqRes[x][y][0]<=upperLimit){
+			   					signalPixels++;
+			   				}
+			   			}
+				   	}	
+			   	}		   	
+			   	if(valueCounter != valueColumn.length){
+			   		IJ.log("ERROR IN CODE!!!");
+			   	}
+			   	roiAverage = tools.getAverage(valueColumn);
+			   	roiSD = tools.getSD(valueColumn);
+			   	
+			  //DETERMINE PARAMETERS FOR ENTIRE IMAGE
+			   	double wholeImpMin = Double.POSITIVE_INFINITY, wholeImpMax = Double.NEGATIVE_INFINITY, wholeImpAverage, wholeImpSD;
+			   	valueColumn = new double [signalPixels];
+			   	valueCounter = 0;
+			   	for(int x = 0; x < imp.getWidth(); x++){
+			   		progress.addToBar(0.05/(double)imp.getWidth());
+			   		for(int y = 0; y < imp.getHeight(); y++){
+			   			if(signalPostCorr[x][y]){
+			   				if(wholeImpMin > corrFreqRes[x][y][0] && corrFreqRes[x][y][0] != -1){
+			   					wholeImpMin = corrFreqRes[x][y][0];
+			   				}
+			   				if(wholeImpMax < corrFreqRes[x][y][0]){
+			   					wholeImpMax = corrFreqRes[x][y][0];
+			   				}
+			   				if(corrFreqRes[x][y][0]>=lowerLimit && corrFreqRes[x][y][0]<=upperLimit){
+			   					valueColumn [valueCounter] = corrFreqRes[x][y][0];
+				   				valueCounter++;
+			   				}		   				
+			   			}		   			
+				   	}	
+			   	}		   	
+			   	if(valueCounter != valueColumn.length){
+			   		IJ.log("ERROR IN CODE - 2!!!");
+			   	}
+			   	wholeImpAverage = tools.getAverage(valueColumn);
+			   	wholeImpSD = tools.getSD(valueColumn);
+			   	
+			   	//DETERMINE POWER SPECTRUM IN ROI
+			   	assembledPowerSpectrumFromRoi = getAssembledPowerSpectrumInRoi(imp, signalPostCorr, selections[task], smoothWindowSize);
+			   	assembledPowerSpectrumFromRoiCorr = new double [0];
+			   	roiFreqs = new int [2];
+			   	roiAmpl = new double [2];
+			   	roiCorrAmpl = new double [2];
+				roiCorrSharp = new double [2];  
+				roiCom = 0.0;
+				ctr = 0;
+			   	
+			   	if(assembledPowerSpectrumFromRoi != null){
+			   		assembledPowerSpectrumFromRoiCorr = new double [assembledPowerSpectrumFromRoi.length];
+			   		for(int i = 0; i < assembledPowerSpectrumFromRoi.length; i++){
+				   		assembledPowerSpectrumFromRoiCorr [i] = assembledPowerSpectrumFromRoi [i] - powerSpectrumBackground [0][i] - limitSD * powerSpectrumBackground [1][i];
+	//			   		assembledPowerSpectrumFromRoiCorr [i] = assembledPowerSpectrumFromRoi [i] - powerSpectrumMinimum [i];
+				   		if(assembledPowerSpectrumFromRoiCorr [i] < 0.0){
+				   			assembledPowerSpectrumFromRoiCorr [i] = 0.0;
+				   		}
+				   	}
+				   	
+				   	roiFreqs = tools.get2HighestMaximaIndicesWithinRange(assembledPowerSpectrumFromRoiCorr, 
+				   			(int)Math.round(lowerLimit*(assembledPowerSpectrumFromRoiCorr.length/sampleRate)), 
+				   			(int)Math.round(upperLimit*(assembledPowerSpectrumFromRoiCorr.length/sampleRate)));
+				    
+				    roiCom = tools.getCenterOfMassOfRange(assembledPowerSpectrumFromRoiCorr, 0, 
+				    		(assembledPowerSpectrumFromRoiCorr.length/2)-1);
+				    if(roiFreqs[0] >= 0 && roiFreqs [0] < assembledPowerSpectrumFromRoiCorr.length){
+				    	roiAmpl [0] = assembledPowerSpectrumFromRoiCorr [roiFreqs[0]] + powerSpectrumBackground [0][roiFreqs[0]] + limitSD * powerSpectrumBackground [1][roiFreqs[0]];
+				    	roiCorrAmpl [0] = assembledPowerSpectrumFromRoiCorr [roiFreqs[0]];
+	//			    	roiAmpl [0] = assembledPowerSpectrumFromRoiCorr [roiFreqs[0]] + powerSpectrumMinimum [roiFreqs[0]];
+				    	roiCorrSharp [0] = 0.0;
+				    	ctr = 0;
+				    	if(assembledPowerSpectrumFromRoiCorr [roiFreqs[0]-1] != 0.0){
+				    		roiCorrSharp [0] += Math.abs(assembledPowerSpectrumFromRoiCorr [roiFreqs[0]] - assembledPowerSpectrumFromRoiCorr [roiFreqs[0]-1]);
+				    		ctr++;
+				    	}
+				    	if(assembledPowerSpectrumFromRoiCorr [roiFreqs[0]+1] != 0.0){
+				    		roiCorrSharp [0] += Math.abs(assembledPowerSpectrumFromRoiCorr [roiFreqs[0]+1] - assembledPowerSpectrumFromRoiCorr [roiFreqs[0]]);
+				    		ctr++;
+				    	}
+				    	if(ctr != 0) roiCorrSharp [0] /= (double) ctr;			    	
+				    }else{
+				    	roiAmpl [0] = 0.0;
+				    	roiCorrAmpl [0] = 0.0;
+				    	roiCorrSharp [0] = 0.0;
+				    }
+				    if(roiFreqs[1] >= 0 && roiFreqs [1] < assembledPowerSpectrumFromRoiCorr.length){
+				    	roiAmpl [1] = assembledPowerSpectrumFromRoiCorr [roiFreqs[1]] + powerSpectrumBackground [0][roiFreqs[1]] + limitSD * powerSpectrumBackground [1][roiFreqs[1]];
+				    	roiCorrAmpl [1] = assembledPowerSpectrumFromRoiCorr [roiFreqs[1]];
+	//			    	roiAmpl [1] = assembledPowerSpectrumFromRoiCorr [roiFreqs[1]] + powerSpectrumMinimum [roiFreqs[1]];
+				    	roiCorrSharp [1] = 0.0;
+				    	ctr = 0;
+				    	if(assembledPowerSpectrumFromRoiCorr [roiFreqs[1]-1] != 0.0){
+				    		roiCorrSharp [1] += Math.abs(assembledPowerSpectrumFromRoiCorr [roiFreqs[1]] - assembledPowerSpectrumFromRoiCorr [roiFreqs[1]-1]);
+				    		ctr++;
+				    	}
+				    	if(assembledPowerSpectrumFromRoiCorr [roiFreqs[1]+1] != 0.0){
+				    		roiCorrSharp [1] += Math.abs(assembledPowerSpectrumFromRoiCorr [roiFreqs[1]+1] - assembledPowerSpectrumFromRoiCorr [roiFreqs[1]]);
+				    		ctr++;
+				    	}
+				    	if(ctr != 0) roiCorrSharp [1] /= (double) ctr;
+				    }else{
+				    	roiAmpl [1] = 0.0;
+				    	roiCorrAmpl [1] = 0.0;
+				    	roiCorrSharp [1] = 0.0;
+				    } 	
+			   	}
+			   	
+			   	
 			    
-			    roiCom = tools.getCenterOfMassOfRange(assembledPowerSpectrumFromRoiCorr, 0, 
-			    		(assembledPowerSpectrumFromRoiCorr.length/2)-1);
-			    if(roiFreqs[0] >= 0 && roiFreqs [0] < assembledPowerSpectrumFromRoiCorr.length){
-			    	roiAmpl [0] = assembledPowerSpectrumFromRoiCorr [roiFreqs[0]] + powerSpectrumBackground [0][roiFreqs[0]] + limitSD * powerSpectrumBackground [1][roiFreqs[0]];
-			    	roiCorrAmpl [0] = assembledPowerSpectrumFromRoiCorr [roiFreqs[0]];
-//			    	roiAmpl [0] = assembledPowerSpectrumFromRoiCorr [roiFreqs[0]] + powerSpectrumMinimum [roiFreqs[0]];
-			    	roiCorrSharp [0] = 0.0;
-			    	ctr = 0;
-			    	if(assembledPowerSpectrumFromRoiCorr [roiFreqs[0]-1] != 0.0){
-			    		roiCorrSharp [0] += Math.abs(assembledPowerSpectrumFromRoiCorr [roiFreqs[0]] - assembledPowerSpectrumFromRoiCorr [roiFreqs[0]-1]);
-			    		ctr++;
-			    	}
-			    	if(assembledPowerSpectrumFromRoiCorr [roiFreqs[0]+1] != 0.0){
-			    		roiCorrSharp [0] += Math.abs(assembledPowerSpectrumFromRoiCorr [roiFreqs[0]+1] - assembledPowerSpectrumFromRoiCorr [roiFreqs[0]]);
-			    		ctr++;
-			    	}
-			    	if(ctr != 0) roiCorrSharp [0] /= (double) ctr;			    	
-			    }else{
-			    	roiAmpl [0] = 0.0;
-			    	roiCorrAmpl [0] = 0.0;
-			    	roiCorrSharp [0] = 0.0;
-			    }
-			    if(roiFreqs[1] >= 0 && roiFreqs [1] < assembledPowerSpectrumFromRoiCorr.length){
-			    	roiAmpl [1] = assembledPowerSpectrumFromRoiCorr [roiFreqs[1]] + powerSpectrumBackground [0][roiFreqs[1]] + limitSD * powerSpectrumBackground [1][roiFreqs[1]];
-			    	roiCorrAmpl [1] = assembledPowerSpectrumFromRoiCorr [roiFreqs[1]];
-//			    	roiAmpl [1] = assembledPowerSpectrumFromRoiCorr [roiFreqs[1]] + powerSpectrumMinimum [roiFreqs[1]];
-			    	roiCorrSharp [1] = 0.0;
-			    	ctr = 0;
-			    	if(assembledPowerSpectrumFromRoiCorr [roiFreqs[1]-1] != 0.0){
-			    		roiCorrSharp [1] += Math.abs(assembledPowerSpectrumFromRoiCorr [roiFreqs[1]] - assembledPowerSpectrumFromRoiCorr [roiFreqs[1]-1]);
-			    		ctr++;
-			    	}
-			    	if(assembledPowerSpectrumFromRoiCorr [roiFreqs[1]+1] != 0.0){
-			    		roiCorrSharp [1] += Math.abs(assembledPowerSpectrumFromRoiCorr [roiFreqs[1]+1] - assembledPowerSpectrumFromRoiCorr [roiFreqs[1]]);
-			    		ctr++;
-			    	}
-			    	if(ctr != 0) roiCorrSharp [1] /= (double) ctr;
-			    }else{
-			    	roiAmpl [1] = 0.0;
-			    	roiCorrAmpl [1] = 0.0;
-			    	roiCorrSharp [1] = 0.0;
-			    } 	
-		   	}
-		   	
-		   	
-		    
-		  //DETERMINE POWER SPECTRUM IN ENTIRE IMAGE
-		   	double [] assembledPowerSpectrumFromWholeImp = getAssembledPowerSpectrum(imp, signalPostCorr, smoothWindowSize);
-		 	double [] assembledPowerSpectrumFromWholeImpCorr = new double [0];
-			int [] wholeImpFreqs = new int [2];
-		   	double [] wholeImpAmpl = new double [2];
-		   	double [] wholeImpCorrAmpl = new double [2];
-		   	double [] wholeImpCorrSharp = new double [2];
-		    double wholeImpCom = 0.0;
-			if(assembledPowerSpectrumFromWholeImp != null){
-				assembledPowerSpectrumFromWholeImpCorr = new double [assembledPowerSpectrumFromWholeImp.length];
-				for(int i = 0; i < assembledPowerSpectrumFromWholeImp.length; i++){
-			   		assembledPowerSpectrumFromWholeImpCorr [i] = assembledPowerSpectrumFromWholeImp [i] - powerSpectrumBackground [0][i] - limitSD * powerSpectrumBackground [1][i];
-//			   		assembledPowerSpectrumFromWholeImpCorr [i] = assembledPowerSpectrumFromWholeImp [i] - powerSpectrumMinimum [i];
-			   		if(assembledPowerSpectrumFromWholeImpCorr [i] < 0.0){
-			   			assembledPowerSpectrumFromWholeImpCorr [i] = 0.0;
-			   		}
-			   	}
+			  //DETERMINE POWER SPECTRUM IN ENTIRE IMAGE
+			   	assembledPowerSpectrumFromWholeImp = getAssembledPowerSpectrum(imp, signalPostCorr, smoothWindowSize);
+			 	assembledPowerSpectrumFromWholeImpCorr = new double [0];
+				wholeImpFreqs = new int [2];
+			   	wholeImpAmpl = new double [2];
+			   	wholeImpCorrAmpl = new double [2];
+			   	wholeImpCorrSharp = new double [2];
+			    wholeImpCom = 0.0;
+				if(assembledPowerSpectrumFromWholeImp != null){
+					assembledPowerSpectrumFromWholeImpCorr = new double [assembledPowerSpectrumFromWholeImp.length];
+					for(int i = 0; i < assembledPowerSpectrumFromWholeImp.length; i++){
+				   		assembledPowerSpectrumFromWholeImpCorr [i] = assembledPowerSpectrumFromWholeImp [i] - powerSpectrumBackground [0][i] - limitSD * powerSpectrumBackground [1][i];
+	//			   		assembledPowerSpectrumFromWholeImpCorr [i] = assembledPowerSpectrumFromWholeImp [i] - powerSpectrumMinimum [i];
+				   		if(assembledPowerSpectrumFromWholeImpCorr [i] < 0.0){
+				   			assembledPowerSpectrumFromWholeImpCorr [i] = 0.0;
+				   		}
+				   	}
+				   	
+				   	wholeImpFreqs = tools.get2HighestMaximaIndicesWithinRange(assembledPowerSpectrumFromWholeImpCorr, 
+				   			(int)Math.round(lowerLimit*(assembledPowerSpectrumFromRoiCorr.length/sampleRate)), 
+				   			(int)Math.round(upperLimit*(assembledPowerSpectrumFromRoiCorr.length/sampleRate)));
+				    wholeImpAmpl = new double [2];
+				    wholeImpCorrAmpl = new double [2];
+				    wholeImpCorrSharp = new double [2];
+				    wholeImpCom = tools.getCenterOfMassOfRange(assembledPowerSpectrumFromWholeImpCorr, 0, 
+				    		(assembledPowerSpectrumFromWholeImpCorr.length/2)-1);
+				    if(wholeImpFreqs[0] >= 0 && wholeImpFreqs [0] < assembledPowerSpectrumFromWholeImpCorr.length){
+				    	wholeImpAmpl [0] = assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]] + powerSpectrumBackground [0][wholeImpFreqs[0]] + limitSD * powerSpectrumBackground [1][wholeImpFreqs[0]];
+				    	wholeImpCorrAmpl [0] = assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]];
+	//			    	wholeImpAmpl [0] = assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]] + powerSpectrumMinimum [wholeImpFreqs[0]];
+				    	wholeImpCorrSharp [0] = 0.0;
+				    	ctr = 0;
+				    	if(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]-1] != 0.0){
+				    		wholeImpCorrSharp [0] += Math.abs(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]] - assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]-1]);
+				    		ctr++;
+				    	}
+				    	if(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]+1] != 0.0){
+				    		wholeImpCorrSharp [0] += Math.abs(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]+1] - assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]]);
+				    		ctr++;
+				    	}
+				    	if(ctr != 0) wholeImpCorrSharp [0] /= (double) ctr;	
+				    }else{
+				    	wholeImpAmpl [0] = 0.0;
+				    	wholeImpCorrAmpl [0] = 0.0;
+				    	wholeImpCorrSharp [0] = 0.0;
+				    }
+				    if(wholeImpFreqs[1] >= 0 && wholeImpFreqs [1] < assembledPowerSpectrumFromWholeImpCorr.length){
+				    	wholeImpAmpl [1] = assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]] + powerSpectrumBackground [0][wholeImpFreqs[1]] + limitSD * powerSpectrumBackground [1][wholeImpFreqs[1]];
+				    	wholeImpCorrAmpl [1] = assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]];
+	//			    	wholeImpAmpl [1] = assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]] + powerSpectrumMinimum [wholeImpFreqs[1]];
+				    	wholeImpCorrSharp [1] = 0.0;
+				    	ctr = 0;
+				    	if(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]-1] != 0.0){
+				    		wholeImpCorrSharp [1] += Math.abs(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]] - assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]-1]);
+				    		ctr++;
+				    	}
+				    	if(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]+1] != 0.0){
+				    		wholeImpCorrSharp [1] += Math.abs(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]+1] - assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]]);
+				    		ctr++;
+				    	}
+				    	if(ctr != 0) wholeImpCorrSharp [1] /= (double) ctr;	
+				    }else{
+				    	wholeImpAmpl [1] = 0.0;
+				    	wholeImpCorrAmpl [1] = 0.0;
+				    	wholeImpCorrSharp [1] = 0.0;
+				    }		   	
+				}
+				
+				// GET EIGENVECTOR MAP
+	//			progress.updateBarText("get eigentvector map - raw frequency results...");
+	//			double [][] evMapRaw = getEigenVectorMap(rawFreqRes, 5, 0);
+	//			progress.updateBarText("get eigentvector map - corrected frequency results...");
+	//			double [][] evMapCorr = getEigenVectorMap(corrFreqRes, 5, 0);
 			   	
-			   	wholeImpFreqs = tools.get2HighestMaximaIndicesWithinRange(assembledPowerSpectrumFromWholeImpCorr, 
-			   			(int)Math.round(lowerLimit*(assembledPowerSpectrumFromRoiCorr.length/sampleRate)), 
-			   			(int)Math.round(upperLimit*(assembledPowerSpectrumFromRoiCorr.length/sampleRate)));
-			    wholeImpAmpl = new double [2];
-			    wholeImpCorrAmpl = new double [2];
-			    wholeImpCorrSharp = new double [2];
-			    wholeImpCom = tools.getCenterOfMassOfRange(assembledPowerSpectrumFromWholeImpCorr, 0, 
-			    		(assembledPowerSpectrumFromWholeImpCorr.length/2)-1);
-			    if(wholeImpFreqs[0] >= 0 && wholeImpFreqs [0] < assembledPowerSpectrumFromWholeImpCorr.length){
-			    	wholeImpAmpl [0] = assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]] + powerSpectrumBackground [0][wholeImpFreqs[0]] + limitSD * powerSpectrumBackground [1][wholeImpFreqs[0]];
-			    	wholeImpCorrAmpl [0] = assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]];
-//			    	wholeImpAmpl [0] = assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]] + powerSpectrumMinimum [wholeImpFreqs[0]];
-			    	wholeImpCorrSharp [0] = 0.0;
-			    	ctr = 0;
-			    	if(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]-1] != 0.0){
-			    		wholeImpCorrSharp [0] += Math.abs(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]] - assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]-1]);
-			    		ctr++;
-			    	}
-			    	if(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]+1] != 0.0){
-			    		wholeImpCorrSharp [0] += Math.abs(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]+1] - assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]]);
-			    		ctr++;
-			    	}
-			    	if(ctr != 0) wholeImpCorrSharp [0] /= (double) ctr;	
-			    }else{
-			    	wholeImpAmpl [0] = 0.0;
-			    	wholeImpCorrAmpl [0] = 0.0;
-			    	wholeImpCorrSharp [0] = 0.0;
-			    }
-			    if(wholeImpFreqs[1] >= 0 && wholeImpFreqs [1] < assembledPowerSpectrumFromWholeImpCorr.length){
-			    	wholeImpAmpl [1] = assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]] + powerSpectrumBackground [0][wholeImpFreqs[1]] + limitSD * powerSpectrumBackground [1][wholeImpFreqs[1]];
-			    	wholeImpCorrAmpl [1] = assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]];
-//			    	wholeImpAmpl [1] = assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]] + powerSpectrumMinimum [wholeImpFreqs[1]];
-			    	wholeImpCorrSharp [1] = 0.0;
-			    	ctr = 0;
-			    	if(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]-1] != 0.0){
-			    		wholeImpCorrSharp [1] += Math.abs(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]] - assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]-1]);
-			    		ctr++;
-			    	}
-			    	if(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]+1] != 0.0){
-			    		wholeImpCorrSharp [1] += Math.abs(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]+1] - assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]]);
-			    		ctr++;
-			    	}
-			    	if(ctr != 0) wholeImpCorrSharp [1] /= (double) ctr;	
-			    }else{
-			    	wholeImpAmpl [1] = 0.0;
-			    	wholeImpCorrAmpl [1] = 0.0;
-			    	wholeImpCorrSharp [1] = 0.0;
-			    }		   	
-			}
-			
-			// GET EIGENVECTOR MAP
-			progress.updateBarText("get eigentvector map - raw frequency results...");
-			double [][] evMapRaw = getEigenVectorMap(rawFreqRes, 5, 0);
-			progress.updateBarText("get eigentvector map - corrected frequency results...");
-			double [][] evMapCorr = getEigenVectorMap(corrFreqRes, 5, 0);
-		   	
-	   	/******************************************************************
-		*** 							Output							***	
-		*******************************************************************/
-			
-			Date currentDate = new Date();					
-			
-			String filePrefix;
-			if(name[task].contains(".")){
-				filePrefix = name[task].substring(0,name[task].lastIndexOf(".")) + "_Cil";
-			}else{
-				filePrefix = name[task] + "_Cil";
-			}
-			
-			if(selectedOutputVariant.equals(outputVariant[1])){
-				//saveDate
-				filePrefix += "_" + NameDateFormatter.format(currentDate);
-			}
-			
-			filePrefix = dir[task] + filePrefix;
-			
-			//save metadata
-			TextPanel tp1 = new TextPanel("results");
-			TextPanel tp2 = new TextPanel("results w");
-			TextPanel tp3 = new TextPanel("results r");
-			
-			tp1.append("Saving date:	" + FullDateFormatter.format(currentDate)
-						+ "	Starting date:	" + FullDateFormatter.format(startDate));
-			tp1.append("Image name:	" + name[task]);
-			tp1.append("");
-			tp1.append("Parameters");
-			tp1.append("	sampling rate (Hz)	" + constants.df6US.format(sampleRate));
-			tp1.append("	sliding window size for smoothing power spectrum (Hz)	" + constants.df6US.format(smoothFreq)	+	"	=	" + constants.df0.format(smoothWindowSize)	+ "	(if = 0 -> no smoothing)");
-			tp1.append("	Percent lower powers used for thresholding power spectrum	" + percentLowest);
-			tp1.append("	SD fold used for power thresholding	" + limitSD);
-			tp1.append("	max accepted frequency for filtering (Hz)	" + constants.df6US.format(upperLimit));
-			tp1.append("	min accepted frequency for filtering (Hz)	" + constants.df6US.format(lowerLimit));
-			
-			tp1.append("");
-			tp1.append("Estimated Parameters");
-			tp1.append("	average of lower powers	" + constants.df6US.format(lowerPowerAvgSD[0]));
-			tp1.append("	standard deviation of lower powers	" + constants.df6US.format(lowerPowerAvgSD[1]));
-			
-			tp1.append("");
-			tp1.append("Result (for entire image)");
-			tp1.append("	Average freq (Hz)	SD of freq (Hz)	min freq (Hz)	max freq (Hz)"
-					+ "	lower freq in APS (Hz)"
-					+ "	power of lower freq. in APS (dB)"
-					+ "	higher freq in APS (Hz)"
-					+ "	power of higher freq. in APS (dB)"
-					+ "	COM of APS"
-					+ "	primary freq in APS (Hz)"
-					+ "	power of prim. freq. in APS (dB)"
-					+ "	corrected power of prim. freq. in APS (dB)"
-					+ "	secondary freq in APS (Hz)"
-					+ "	power of sec. freq. in APS (dB)"
-					+ "	corrected power of sec. freq. in APS (dB)"
-					+ "	corr. sharpness of prim. freq. in APS (dB)"
-					+ "	corr. sharpness of sec. freq. in APS (dB)");
-			String appText = "";
-			if(assembledPowerSpectrumFromWholeImp != null){
-					appText = "	" + constants.df6US.format(wholeImpAverage)
-					+ "	" + constants.df6US.format(wholeImpSD)
-					+ "	" + constants.df6US.format(wholeImpMin)
-					+ "	" + constants.df6US.format(wholeImpMax);
-				if(wholeImpFreqs [0] < wholeImpFreqs [1]){
-					appText += "	"; if(wholeImpFreqs[0]!=-1)	appText += constants.df6US.format(wholeImpFreqs [0] * sampleRate / assembledPowerSpectrumFromWholeImp.length);
-					appText += "	"; if(wholeImpFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(wholeImpAmpl [0])*10);
-					appText += "	"; if(wholeImpFreqs[1]!=-1)	appText += constants.df6US.format(wholeImpFreqs [1] * sampleRate / assembledPowerSpectrumFromWholeImp.length);
-					appText += "	"; if(wholeImpFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(wholeImpAmpl [1])*10);
-					appText += "	"; appText += constants.df6US.format(wholeImpCom * sampleRate / assembledPowerSpectrumFromWholeImp.length);			
-				}else{
-					appText += "	"; if(wholeImpFreqs[1]!=-1)	appText += constants.df6US.format(wholeImpFreqs [1] * sampleRate / assembledPowerSpectrumFromWholeImp.length);
-					appText += "	"; if(wholeImpFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(wholeImpAmpl [1])*10);
-					appText += "	"; if(wholeImpFreqs[0]!=-1)	appText += constants.df6US.format(wholeImpFreqs [0] * sampleRate / assembledPowerSpectrumFromWholeImp.length);
-					appText += "	"; if(wholeImpFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(wholeImpAmpl [0])*10);
-					appText += "	"; appText += constants.df6US.format(wholeImpCom * sampleRate / assembledPowerSpectrumFromWholeImp.length);			
-				}
-				appText += "	"; if(wholeImpFreqs[0]!=-1)	appText += constants.df6US.format(wholeImpFreqs [0] * sampleRate / assembledPowerSpectrumFromWholeImp.length);
-				appText += "	"; if(wholeImpFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(wholeImpAmpl [0])*10);
-				appText += "	"; if(wholeImpFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(wholeImpCorrAmpl [0])*10);
-				appText += "	"; if(wholeImpFreqs[1]!=-1)	appText += constants.df6US.format(wholeImpFreqs [1] * sampleRate / assembledPowerSpectrumFromWholeImp.length);
-				appText += "	"; if(wholeImpFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(wholeImpAmpl [1])*10);
-				appText += "	"; if(wholeImpFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(wholeImpCorrAmpl [1])*10);
-				appText += "	"; if(wholeImpFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(wholeImpCorrSharp [0])*10);
-				appText += "	"; if(wholeImpFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(wholeImpCorrSharp [1])*10);
+				//GET Phases for specific frequency
+				phaseMapRoiFreqs = new double [imp.getWidth()][imp.getHeight()][2];
+				phaseMapWholeImpFreqs = new double [imp.getWidth()][imp.getHeight()][2];
+				locFreqs = new double [4];
+	   			locFreqs [0] = roiFreqs [0] * sampleRate / assembledPowerSpectrumFromRoi.length;
+	   			locFreqs [1] = roiFreqs [1] * sampleRate / assembledPowerSpectrumFromRoi.length;
+	   			locFreqs [2] = wholeImpFreqs [0] * sampleRate / assembledPowerSpectrumFromRoi.length;
+	   			locFreqs [3] = wholeImpFreqs [1] * sampleRate / assembledPowerSpectrumFromRoi.length;
+	   			double [] phases; 
+			   	valueColumn = new double [imp.getStackSize()];
+				for(int x = 0; x < imp.getWidth(); x++){
+			   		progress.addToBar(0.25/(double)imp.getWidth());
+			   		for(int y = 0; y < imp.getHeight(); y++){
+			   			if(!signalPostCorr[x][y]) continue;
+			   			
+			   			for(int i = 0; i < imp.getStackSize(); i++){
+			   				valueColumn [i] = imp.getStack().getVoxel(x, y, i);
+			   			}
+			   			phases = getPhaseOfSpecificFrequencies(valueColumn, sampleRate, false, true, locFreqs);
+			   			
+			   			phaseMapRoiFreqs [x][y][0] = phases [0];
+			   			phaseMapRoiFreqs [x][y][1] = phases [1];
+			   			phaseMapWholeImpFreqs [x][y][0] = phases [2];
+			   			phaseMapWholeImpFreqs [x][y][1] = phases [3];
+				   	}	
+			   	}
 				
-			}			
-			tp1.append(appText);
-			tp2.append(name[task] + appText);
-						
-			tp1.append("");
-			tp1.append("	Assembled power spectrum (APC) in entire image");
-			if(assembledPowerSpectrumFromWholeImp != null){
-				appText = "frequency (Hz)";
-				for(int i = 0; i < assembledPowerSpectrumFromWholeImp.length; i++){
-					appText += "	" + constants.df6US.format((double)i * sampleRate / (double) assembledPowerSpectrumFromWholeImp.length);
-			 	}
-				tp1.append(appText);
-				appText = "raw power (dB)";
-				for(int i = 0; i < assembledPowerSpectrumFromWholeImp.length; i++){
-					appText += "	";	if(assembledPowerSpectrumFromWholeImp[i]!=0.0)	appText += constants.df6US.format(Math.log10(assembledPowerSpectrumFromWholeImp[i])*10);
-			 	}
-				tp1.append(appText);
-				appText = "corrected power (dB)";
-				for(int i = 0; i < assembledPowerSpectrumFromWholeImpCorr.length; i++){
-					appText += "	";	if(assembledPowerSpectrumFromWholeImpCorr[i]!=0.0)	appText += constants.df6US.format(Math.log10(assembledPowerSpectrumFromWholeImpCorr[i])*10);
-			 	}
-				tp1.append(appText);
-			}else{
+				
+		   	/******************************************************************
+			*** 							Output							***	
+			*******************************************************************/
+				
+				Date currentDate = new Date();					
+				if(name[task].contains(".")){
+					filePrefix = name[task].substring(0,name[task].lastIndexOf(".")) + "_Cil";
+				}else{
+					filePrefix = name[task] + "_Cil";
+				}
+				
+				if(selectedOutputVariant.equals(outputVariant[1])){
+					//saveDate
+					filePrefix += "_" + NameDateFormatter.format(currentDate);
+				}
+				
+				filePrefix = dir[task] + filePrefix;
+				
+				//save metadata
+				tp1 = new TextPanel("results");
+				tp2 = new TextPanel("results w");
+				tp3 = new TextPanel("results r");
+				
+				tp1.append("Saving date:	" + FullDateFormatter.format(currentDate)
+							+ "	Starting date:	" + FullDateFormatter.format(startDate));
+				tp1.append("Image name:	" + name[task]);
 				tp1.append("");
+				tp1.append("Parameters");
+				tp1.append("	sampling rate (Hz)	" + constants.df6US.format(sampleRate));
+				tp1.append("	sliding window size for smoothing power spectrum (Hz)	" + constants.df6US.format(smoothFreq)	+	"	=	" + constants.df0.format(smoothWindowSize)	+ "	(if = 0 -> no smoothing)");
+				tp1.append("	Percent lower powers used for thresholding power spectrum	" + percentLowest);
+				tp1.append("	SD fold used for power thresholding	" + limitSD);
+				tp1.append("	max accepted frequency for filtering (Hz)	" + constants.df6US.format(upperLimit));
+				tp1.append("	min accepted frequency for filtering (Hz)	" + constants.df6US.format(lowerLimit));
+				
 				tp1.append("");
+				tp1.append("Estimated Parameters");
+				tp1.append("	average of lower powers	" + constants.df6US.format(lowerPowerAvgSD[0]));
+				tp1.append("	standard deviation of lower powers	" + constants.df6US.format(lowerPowerAvgSD[1]));
+				
 				tp1.append("");
-			}
-			
-			
-			tp1.append("");
-			tp1.append("Result (for selected ROI)");
-			tp1.append("	Average freq (Hz)	SD of freq (Hz)	min freq (Hz)	max freq (Hz)"
-					+ "	lower freq in APS (Hz)"
-					+ "	power of lower freq. in APS (dB)"
-					+ "	higher freq in APS (Hz)"
-					+ "	power of higher freq. in APS (dB)"
-					+ "	COM of APS"
-					+ "	primary freq in APS (Hz)"
-					+ "	power of prim. freq. in APS (dB)"
-					+ "	corrected power of prim. freq. in APS (dB)"
-					+ "	secondary freq in APS (Hz)"
-					+ "	power of sec. freq. in APS (dB)"
-					+ "	corrected power of sec. freq. in APS (dB)"
-					+ "	corr. sharpness of prim. freq. in APS (dB)"
-					+ "	corr. sharpness of sec. freq. in APS (dB)");
-
-			appText = "";
-			if(assembledPowerSpectrumFromRoi != null){
-				appText = "	" + constants.df6US.format(roiAverage)
-				+ "	" + constants.df6US.format(roiSD)
-				+ "	" + constants.df6US.format(roiMin)
-				+ "	" + constants.df6US.format(roiMax);
-				if(roiFreqs [0] < roiFreqs [1]){
-					appText += "	"; if(roiFreqs[0]!=-1)	appText += constants.df6US.format(roiFreqs [0] * sampleRate / assembledPowerSpectrumFromRoi.length);
-					appText += "	"; if(roiFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(roiAmpl [0])*10);
-					appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(roiFreqs [1] * sampleRate / assembledPowerSpectrumFromRoi.length);
-					appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiAmpl [1])*10);
-					appText += "	"; appText += constants.df6US.format(roiCom * sampleRate / assembledPowerSpectrumFromRoi.length);
+				tp1.append("Result (for entire image)");
+				tp1.append("	Average freq (Hz)	SD of freq (Hz)	min freq (Hz)	max freq (Hz)"
+						+ "	lower freq in APS (Hz)"
+						+ "	power of lower freq. in APS (dB)"
+						+ "	higher freq in APS (Hz)"
+						+ "	power of higher freq. in APS (dB)"
+						+ "	COM of APS"
+						+ "	primary freq in APS (Hz)"
+						+ "	power of prim. freq. in APS (dB)"
+						+ "	corrected power of prim. freq. in APS (dB)"
+						+ "	secondary freq in APS (Hz)"
+						+ "	power of sec. freq. in APS (dB)"
+						+ "	corrected power of sec. freq. in APS (dB)"
+						+ "	corr. sharpness of prim. freq. in APS (dB)"
+						+ "	corr. sharpness of sec. freq. in APS (dB)");
+				String appText = "";
+				if(assembledPowerSpectrumFromWholeImp != null){
+						appText = "	" + constants.df6US.format(wholeImpAverage)
+						+ "	" + constants.df6US.format(wholeImpSD)
+						+ "	" + constants.df6US.format(wholeImpMin)
+						+ "	" + constants.df6US.format(wholeImpMax);
+					if(wholeImpFreqs [0] < wholeImpFreqs [1]){
+						appText += "	"; if(wholeImpFreqs[0]!=-1)	appText += constants.df6US.format(wholeImpFreqs [0] * sampleRate / assembledPowerSpectrumFromWholeImp.length);
+						appText += "	"; if(wholeImpFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(wholeImpAmpl [0])*10);
+						appText += "	"; if(wholeImpFreqs[1]!=-1)	appText += constants.df6US.format(wholeImpFreqs [1] * sampleRate / assembledPowerSpectrumFromWholeImp.length);
+						appText += "	"; if(wholeImpFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(wholeImpAmpl [1])*10);
+						appText += "	"; appText += constants.df6US.format(wholeImpCom * sampleRate / assembledPowerSpectrumFromWholeImp.length);			
+					}else{
+						appText += "	"; if(wholeImpFreqs[1]!=-1)	appText += constants.df6US.format(wholeImpFreqs [1] * sampleRate / assembledPowerSpectrumFromWholeImp.length);
+						appText += "	"; if(wholeImpFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(wholeImpAmpl [1])*10);
+						appText += "	"; if(wholeImpFreqs[0]!=-1)	appText += constants.df6US.format(wholeImpFreqs [0] * sampleRate / assembledPowerSpectrumFromWholeImp.length);
+						appText += "	"; if(wholeImpFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(wholeImpAmpl [0])*10);
+						appText += "	"; appText += constants.df6US.format(wholeImpCom * sampleRate / assembledPowerSpectrumFromWholeImp.length);			
+					}
+					appText += "	"; if(wholeImpFreqs[0]!=-1)	appText += constants.df6US.format(wholeImpFreqs [0] * sampleRate / assembledPowerSpectrumFromWholeImp.length);
+					appText += "	"; if(wholeImpFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(wholeImpAmpl [0])*10);
+					appText += "	"; if(wholeImpFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(wholeImpCorrAmpl [0])*10);
+					appText += "	"; if(wholeImpFreqs[1]!=-1)	appText += constants.df6US.format(wholeImpFreqs [1] * sampleRate / assembledPowerSpectrumFromWholeImp.length);
+					appText += "	"; if(wholeImpFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(wholeImpAmpl [1])*10);
+					appText += "	"; if(wholeImpFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(wholeImpCorrAmpl [1])*10);
+					appText += "	"; if(wholeImpFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(wholeImpCorrSharp [0])*10);
+					appText += "	"; if(wholeImpFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(wholeImpCorrSharp [1])*10);
+					
+				}			
+				tp1.append(appText);
+				tp2.append(name[task] + appText);
+							
+				tp1.append("");
+				tp1.append("	Assembled power spectrum (APC) in entire image");
+				if(assembledPowerSpectrumFromWholeImp != null){
+					appText = "frequency (Hz)";
+					for(int i = 0; i < assembledPowerSpectrumFromWholeImp.length; i++){
+						appText += "	" + constants.df6US.format((double)i * sampleRate / (double) assembledPowerSpectrumFromWholeImp.length);
+				 	}
+					tp1.append(appText);
+					appText = "raw power (dB)";
+					for(int i = 0; i < assembledPowerSpectrumFromWholeImp.length; i++){
+						appText += "	";	if(assembledPowerSpectrumFromWholeImp[i]!=0.0)	appText += constants.df6US.format(Math.log10(assembledPowerSpectrumFromWholeImp[i])*10);
+				 	}
+					tp1.append(appText);
+					appText = "corrected power (dB)";
+					for(int i = 0; i < assembledPowerSpectrumFromWholeImpCorr.length; i++){
+						appText += "	";	if(assembledPowerSpectrumFromWholeImpCorr[i]!=0.0)	appText += constants.df6US.format(Math.log10(assembledPowerSpectrumFromWholeImpCorr[i])*10);
+				 	}
+					tp1.append(appText);
+				}else{
+					tp1.append("");
+					tp1.append("");
+					tp1.append("");
+				}
+				
+				
+				tp1.append("");
+				tp1.append("Result (for selected ROI)");
+				tp1.append("	Average freq (Hz)	SD of freq (Hz)	min freq (Hz)	max freq (Hz)"
+						+ "	lower freq in APS (Hz)"
+						+ "	power of lower freq. in APS (dB)"
+						+ "	higher freq in APS (Hz)"
+						+ "	power of higher freq. in APS (dB)"
+						+ "	COM of APS"
+						+ "	primary freq in APS (Hz)"
+						+ "	power of prim. freq. in APS (dB)"
+						+ "	corrected power of prim. freq. in APS (dB)"
+						+ "	secondary freq in APS (Hz)"
+						+ "	power of sec. freq. in APS (dB)"
+						+ "	corrected power of sec. freq. in APS (dB)"
+						+ "	corr. sharpness of prim. freq. in APS (dB)"
+						+ "	corr. sharpness of sec. freq. in APS (dB)");
 	
-				}else{
-					appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(roiFreqs [1] * sampleRate / assembledPowerSpectrumFromRoi.length);
-					appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiAmpl [1])*10);
+				appText = "";
+				if(assembledPowerSpectrumFromRoi != null){
+					appText = "	" + constants.df6US.format(roiAverage)
+					+ "	" + constants.df6US.format(roiSD)
+					+ "	" + constants.df6US.format(roiMin)
+					+ "	" + constants.df6US.format(roiMax);
+					if(roiFreqs [0] < roiFreqs [1]){
+						appText += "	"; if(roiFreqs[0]!=-1)	appText += constants.df6US.format(roiFreqs [0] * sampleRate / assembledPowerSpectrumFromRoi.length);
+						appText += "	"; if(roiFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(roiAmpl [0])*10);
+						appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(roiFreqs [1] * sampleRate / assembledPowerSpectrumFromRoi.length);
+						appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiAmpl [1])*10);
+						appText += "	"; appText += constants.df6US.format(roiCom * sampleRate / assembledPowerSpectrumFromRoi.length);
+		
+					}else{
+						appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(roiFreqs [1] * sampleRate / assembledPowerSpectrumFromRoi.length);
+						appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiAmpl [1])*10);
+						appText += "	"; if(roiFreqs[0]!=-1)	appText += constants.df6US.format(roiFreqs [0] * sampleRate / assembledPowerSpectrumFromRoi.length);
+						appText += "	"; if(roiFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(roiAmpl [0])*10);
+						appText += "	"; appText += constants.df6US.format(roiCom * sampleRate / assembledPowerSpectrumFromRoi.length);			
+					}
 					appText += "	"; if(roiFreqs[0]!=-1)	appText += constants.df6US.format(roiFreqs [0] * sampleRate / assembledPowerSpectrumFromRoi.length);
 					appText += "	"; if(roiFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(roiAmpl [0])*10);
-					appText += "	"; appText += constants.df6US.format(roiCom * sampleRate / assembledPowerSpectrumFromRoi.length);			
+					appText += "	"; if(roiFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(roiCorrAmpl [0])*10);
+					appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(roiFreqs [1] * sampleRate / assembledPowerSpectrumFromRoi.length);
+					appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiAmpl [1])*10);
+					appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiCorrAmpl [1])*10);
+					appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiCorrSharp [0])*10);
+					appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiCorrSharp [1])*10);
+				}		
+				tp1.append(appText);
+				tp3.append(name[task] + appText);
+				
+				tp1.append("");
+				tp1.append("	Assembled power spectrum (APC) in Roi");
+				if(assembledPowerSpectrumFromRoi != null){
+					appText = "frequency (Hz)";
+					for(int i = 0; i < assembledPowerSpectrumFromWholeImp.length; i++){
+						appText += "	" + constants.df6US.format((double)i * sampleRate / (double) assembledPowerSpectrumFromRoi.length);
+				 	}
+					tp1.append(appText);
+					appText = "raw power (dB)";
+					for(int i = 0; i < assembledPowerSpectrumFromWholeImp.length; i++){
+						appText += "	";	if(assembledPowerSpectrumFromRoi[i]!=0.0)	appText += constants.df6US.format(Math.log10(assembledPowerSpectrumFromRoi[i])*10);
+				 	}
+					tp1.append(appText);
+					appText = "corrected power (dB)";
+					for(int i = 0; i < assembledPowerSpectrumFromWholeImp.length; i++){
+						appText += "	";	if(assembledPowerSpectrumFromRoiCorr[i]!=0.0)	appText += constants.df6US.format(Math.log10(assembledPowerSpectrumFromRoiCorr[i])*10);
+				 	}
+					tp1.append(appText);
+				}else{
+					tp1.append("");
+					tp1.append("");
+					tp1.append("");
 				}
-				appText += "	"; if(roiFreqs[0]!=-1)	appText += constants.df6US.format(roiFreqs [0] * sampleRate / assembledPowerSpectrumFromRoi.length);
-				appText += "	"; if(roiFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(roiAmpl [0])*10);
-				appText += "	"; if(roiFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(roiCorrAmpl [0])*10);
-				appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(roiFreqs [1] * sampleRate / assembledPowerSpectrumFromRoi.length);
-				appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiAmpl [1])*10);
-				appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiCorrAmpl [1])*10);
-				appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiCorrSharp [0])*10);
-				appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiCorrSharp [1])*10);
-			}		
-			tp1.append(appText);
-			tp3.append(name[task] + appText);
-			
-			tp1.append("");
-			tp1.append("	Assembled power spectrum (APC) in Roi");
-			if(assembledPowerSpectrumFromRoi != null){
-				appText = "frequency (Hz)";
-				for(int i = 0; i < assembledPowerSpectrumFromWholeImp.length; i++){
-					appText += "	" + constants.df6US.format((double)i * sampleRate / (double) assembledPowerSpectrumFromRoi.length);
+				
+				
+				tp1.append("");
+				tp1.append("Detailed results");
+				tp1.append("	Primary Frequency (in Hz, post filtering)");
+				for(int y = 0; y < imp.getHeight(); y++){
+					appText = "";
+					for(int x = 0; x < imp.getWidth(); x++){
+						appText += "	";
+						if(signalPostCorr [x][y] && corrFreqRes [x][y][0]!=0.0 && corrFreqRes [x][y][0] <= sampleRate / 4.0
+								&& corrFreqRes [x][y][0] >= lowerLimit && corrFreqRes [x][y][0] <= upperLimit){
+							appText += constants.df6US.format(corrFreqRes [x][y][0]);
+						}
+			   		}
+					tp1.append(appText);
+			 	}
+				
+				tp1.append("");
+				tp1.append("	Power of primary frequency post filtering (dB)");
+				for(int y = 0; y < imp.getHeight(); y++){
+					appText = "";
+					for(int x = 0; x < imp.getWidth(); x++){
+						appText += "	";
+						if(signalPostCorr [x][y] && corrFreqRes [x][y][0]!=0.0 && corrFreqRes [x][y][0] <= sampleRate / 4.0
+								&& corrFreqRes [x][y][0] >= lowerLimit && corrFreqRes [x][y][0] <= upperLimit){
+							appText += constants.df6US.format(Math.log10(corrFreqRes [x][y][1])*10);
+						}
+			   		}
+					tp1.append(appText);
+			 	}
+				
+				tp1.append("");
+				tp1.append("	Secondary Frequency (in Hz, post filtering)");
+				for(int y = 0; y < imp.getHeight(); y++){
+					appText = "";
+					for(int x = 0; x < imp.getWidth(); x++){
+						appText += "	";
+						if(signalPostCorr [x][y] && corrFreqRes [x][y][0]!=0.0 && corrFreqRes [x][y][2] <= sampleRate / 4.0
+								&& corrFreqRes [x][y][0] >= lowerLimit && corrFreqRes [x][y][0] <= upperLimit){
+							appText += constants.df6US.format(corrFreqRes [x][y][2]);
+						}
+			   		}
+					tp1.append(appText);
+			 	}
+				
+				tp1.append("");
+				tp1.append("	Power of secondary frequency post filtering (dB)");
+				for(int y = 0; y < imp.getHeight(); y++){
+					appText = "";
+					for(int x = 0; x < imp.getWidth(); x++){
+						appText += "	";
+						if(signalPostCorr [x][y] && corrFreqRes [x][y][0]!=0.0 && corrFreqRes [x][y][2] <= sampleRate / 4.0
+								&& corrFreqRes [x][y][0] >= lowerLimit && corrFreqRes [x][y][0] <= upperLimit){
+							appText += constants.df6US.format(Math.log10(corrFreqRes [x][y][3])*10);
+						}
+			   		}
+					tp1.append(appText);
+			 	}
+				
+				tp1.append("");			
+				tp1.append("	COM of frequencies (in Hz, post filtering)");
+				for(int y = 0; y < imp.getHeight(); y++){
+					appText = "";
+					for(int x = 0; x < imp.getWidth(); x++){
+						appText += "	";
+						if(signalPostCorr [x][y] && corrFreqRes [x][y][0]!=0.0 && corrFreqRes [x][y][4] <= sampleRate / 4.0
+								&& corrFreqRes [x][y][0] >= lowerLimit && corrFreqRes [x][y][0] <= upperLimit){
+							appText += constants.df6US.format(corrFreqRes [x][y][4]);
+						}
+			   		}
+					tp1.append(appText);
+			 	}
+				
+				tp1.append("");
+				tp1.append("	Background Power Spectrum");
+				appText = "	frequency (Hz)";
+				for(int i = 0; i < powerSpectrumBackground[0].length; i++){
+					appText += "	" + constants.df6US.format((double)i * sampleRate / (double) powerSpectrumBackground[0].length);
 			 	}
 				tp1.append(appText);
-				appText = "raw power (dB)";
-				for(int i = 0; i < assembledPowerSpectrumFromWholeImp.length; i++){
-					appText += "	";	if(assembledPowerSpectrumFromRoi[i]!=0.0)	appText += constants.df6US.format(Math.log10(assembledPowerSpectrumFromRoi[i])*10);
+				appText = "	average power (dB)";
+				for(int i = 0; i < powerSpectrumBackground[0].length; i++){
+					appText += "	" + constants.df6US.format(Math.log10(powerSpectrumBackground [0][i])*10);
 			 	}
 				tp1.append(appText);
-				appText = "corrected power (dB)";
-				for(int i = 0; i < assembledPowerSpectrumFromWholeImp.length; i++){
-					appText += "	";	if(assembledPowerSpectrumFromRoiCorr[i]!=0.0)	appText += constants.df6US.format(Math.log10(assembledPowerSpectrumFromRoiCorr[i])*10);
+				appText = "	SD of power (dB)";
+				for(int i = 0; i < powerSpectrumBackground[0].length; i++){
+					appText += "	" + constants.df6US.format(Math.log10(powerSpectrumBackground [1][i])*10);
 			 	}
 				tp1.append(appText);
-			}else{
-				tp1.append("");
-				tp1.append("");
-				tp1.append("");
-			}
-			
-			
-			tp1.append("");
-			tp1.append("Detailed results");
-			tp1.append("	Primary Frequency (in Hz, post filtering)");
-			for(int y = 0; y < imp.getHeight(); y++){
-				appText = "";
-				for(int x = 0; x < imp.getWidth(); x++){
-					appText += "	";
-					if(signalPostCorr [x][y] && corrFreqRes [x][y][0]!=0.0 && corrFreqRes [x][y][0] <= sampleRate / 4.0
-							&& corrFreqRes [x][y][0] >= lowerLimit && corrFreqRes [x][y][0] <= upperLimit){
-						appText += constants.df6US.format(corrFreqRes [x][y][0]);
-					}
-		   		}
-				tp1.append(appText);
-		 	}
-			
-			tp1.append("");
-			tp1.append("	Power of primary frequency post filtering (dB)");
-			for(int y = 0; y < imp.getHeight(); y++){
-				appText = "";
-				for(int x = 0; x < imp.getWidth(); x++){
-					appText += "	";
-					if(signalPostCorr [x][y] && corrFreqRes [x][y][0]!=0.0 && corrFreqRes [x][y][0] <= sampleRate / 4.0
-							&& corrFreqRes [x][y][0] >= lowerLimit && corrFreqRes [x][y][0] <= upperLimit){
-						appText += constants.df6US.format(Math.log10(corrFreqRes [x][y][1])*10);
-					}
-		   		}
-				tp1.append(appText);
-		 	}
-			
-			tp1.append("");
-			tp1.append("	Secondary Frequency (in Hz, post filtering)");
-			for(int y = 0; y < imp.getHeight(); y++){
-				appText = "";
-				for(int x = 0; x < imp.getWidth(); x++){
-					appText += "	";
-					if(signalPostCorr [x][y] && corrFreqRes [x][y][0]!=0.0 && corrFreqRes [x][y][2] <= sampleRate / 4.0
-							&& corrFreqRes [x][y][0] >= lowerLimit && corrFreqRes [x][y][0] <= upperLimit){
-						appText += constants.df6US.format(corrFreqRes [x][y][2]);
-					}
-		   		}
-				tp1.append(appText);
-		 	}
-			
-			tp1.append("");
-			tp1.append("	Power of secondary frequency post filtering (dB)");
-			for(int y = 0; y < imp.getHeight(); y++){
-				appText = "";
-				for(int x = 0; x < imp.getWidth(); x++){
-					appText += "	";
-					if(signalPostCorr [x][y] && corrFreqRes [x][y][0]!=0.0 && corrFreqRes [x][y][2] <= sampleRate / 4.0
-							&& corrFreqRes [x][y][0] >= lowerLimit && corrFreqRes [x][y][0] <= upperLimit){
-						appText += constants.df6US.format(Math.log10(corrFreqRes [x][y][3])*10);
-					}
-		   		}
-				tp1.append(appText);
-		 	}
-			
-			tp1.append("");			
-			tp1.append("	COM of frequencies (in Hz, post filtering)");
-			for(int y = 0; y < imp.getHeight(); y++){
-				appText = "";
-				for(int x = 0; x < imp.getWidth(); x++){
-					appText += "	";
-					if(signalPostCorr [x][y] && corrFreqRes [x][y][0]!=0.0 && corrFreqRes [x][y][4] <= sampleRate / 4.0
-							&& corrFreqRes [x][y][0] >= lowerLimit && corrFreqRes [x][y][0] <= upperLimit){
-						appText += constants.df6US.format(corrFreqRes [x][y][4]);
-					}
-		   		}
-				tp1.append(appText);
-		 	}
-			
-			tp1.append("");
-			tp1.append("	Background Power Spectrum");
-			appText = "	frequency (Hz)";
-			for(int i = 0; i < powerSpectrumBackground[0].length; i++){
-				appText += "	" + constants.df6US.format((double)i * sampleRate / (double) powerSpectrumBackground[0].length);
-		 	}
-			tp1.append(appText);
-			appText = "	average power (dB)";
-			for(int i = 0; i < powerSpectrumBackground[0].length; i++){
-				appText += "	" + constants.df6US.format(Math.log10(powerSpectrumBackground [0][i])*10);
-		 	}
-			tp1.append(appText);
-			appText = "	SD of power (dB)";
-			for(int i = 0; i < powerSpectrumBackground[0].length; i++){
-				appText += "	" + constants.df6US.format(Math.log10(powerSpectrumBackground [1][i])*10);
-		 	}
-			tp1.append(appText);
-			
-//			tp1.append("	Minimum Power Spectrum");
-//			appText = "	frequency (Hz)";
-//			for(int i = 0; i < assembledPowerSpectrumFromWholeImp.length; i++){
-//				appText += "	" + constants.df6US.format((double)i * sampleRate / (double) powerSpectrumMinimum.length);
-//		 	}
-//			tp1.append(appText);
-//			appText = "	minimum power (dB)";
-//			for(int i = 0; i < assembledPowerSpectrumFromWholeImp.length; i++){
-//				appText += "	" + constants.df6US.format(Math.log10(powerSpectrumMinimum [i])*10);
-//		 	}
-//			tp1.append(appText);
-			
-			addFooter(tp1, currentDate);				
-			tp1.saveAs(filePrefix + ".txt");
-			tp2.saveAs(filePrefix + "_1w.txt");
-			tp3.saveAs(filePrefix + "_1r.txt");
-//			IJ.saveAsTiff(imp, filePrefix + ".tif");
-			
-			save2DPlot(rawFreqRes, 0, "1st freq (Hz)", filePrefix + "_f1.tif", true, 0.0, sampleRate / 2.0, "Ice");
-			save2DPlot(rawFreqRes, 2, "2nd freq (Hz)", filePrefix + "_f2.tif", true, 0.0, sampleRate / 2.0, "Ice");
-			save2DPlot(rawFreqRes, 1, "power 1", filePrefix + "_f1p.tif", true, 0.0, Double.POSITIVE_INFINITY, "Ice");
-			save2DPlot(rawFreqRes, 3, "power 2", filePrefix + "_f2p.tif", true, 0.0, Double.POSITIVE_INFINITY, "Ice");
-			save2DPlot(rawFreqRes, 4, "com freq (Hz)", filePrefix + "_com.tif", true, 0.0, sampleRate / 4.0, "Ice");
-			save2DPlot(rawFreqRes, 5, "phase 1 (rad)", filePrefix + "_ph1.tif", true, -Math.PI, Math.PI, "Spectrum");
-			save2DPlot(rawFreqRes, 6, "phase 2 (rad)", filePrefix + "_ph2.tif", true, -Math.PI, Math.PI, "Spectrum");
-			save2DPlot(evMapRaw, "eigenvec ph1 (rad)", filePrefix + "_ev1.tif", true, -Math.PI, Math.PI, "Spectrum");
-			saveBooleanAsPlot(signal, "signal region", filePrefix + "_signal.tif");
-			save2DPlot(corrFreqRes, 0, "1st freq (Hz)", filePrefix + "_f1_c.tif", true, lowerLimit, upperLimit, "Ice");
-			save2DPlot(corrFreqRes, 2, "2nd freq (Hz)", filePrefix + "_f2_c.tif", true, lowerLimit, upperLimit, "Ice");
-			save2DPlot(corrFreqRes, 1, "power 1", filePrefix + "_f1p_c.tif", true, 0.0, Double.POSITIVE_INFINITY, "Ice");
-			save2DPlot(corrFreqRes, 3, "power 2", filePrefix + "_f2p_c.tif", true, 0.0, Double.POSITIVE_INFINITY, "Ice");
-			save2DPlot(corrFreqRes, 4, "com freq (Hz)", filePrefix + "_com_c.tif", true, lowerLimit, upperLimit, "Ice");
-			save2DPlot(corrFreqRes, 5, "phase 1 (rad)", filePrefix + "_ph1_c.tif", true, -Math.PI, Math.PI, "Spectrum");
-			save2DPlot(corrFreqRes, 6, "phase 2 (rad)", filePrefix + "_ph2_c.tif", true, -Math.PI, Math.PI, "Spectrum");
-			save2DPlot(evMapCorr, "eigenvec ph1 (rad)", filePrefix + "_ev1_c.tif", true, -Math.PI, Math.PI, "Spectrum");
-			saveBooleanAsPlot(signalPostCorr, "signal region (corr)", filePrefix + "_signal_c.tif");
-			
-			//plot power spectras
-			double [] xValues = new double [(int)(sampleRate/2.0)];
-			double [][] yValues = new double [1][(int)(sampleRate/2.0)];
-			for(int i = 0; i < (int)(sampleRate/2.0); i++){
-				xValues [i] = (double)i * sampleRate / (double) powerSpectrumBackground[0].length;
-				yValues [0][i] = powerSpectrumBackground[0][i];
-		 	}
-			plot2DArray(xValues, yValues, "Power Spectra Background (Mean)", "frequency (Hz)", "power", filePrefix + "_bg_avg", true, new String[]{""});
-			
-			for(int i = 0; i < (int)(sampleRate/2.0); i++){
-				yValues [0][i] = powerSpectrumBackground[1][i];
-		 	}
-			plot2DArray(xValues, yValues, "Power Spectra Background (SD)", "frequency (Hz)", "power", filePrefix + "_bg_sd", true, new String[]{""});
-			
-			if(assembledPowerSpectrumFromWholeImp != null){
+				
+	//			tp1.append("	Minimum Power Spectrum");
+	//			appText = "	frequency (Hz)";
+	//			for(int i = 0; i < assembledPowerSpectrumFromWholeImp.length; i++){
+	//				appText += "	" + constants.df6US.format((double)i * sampleRate / (double) powerSpectrumMinimum.length);
+	//		 	}
+	//			tp1.append(appText);
+	//			appText = "	minimum power (dB)";
+	//			for(int i = 0; i < assembledPowerSpectrumFromWholeImp.length; i++){
+	//				appText += "	" + constants.df6US.format(Math.log10(powerSpectrumMinimum [i])*10);
+	//		 	}
+	//			tp1.append(appText);
+				
+				addFooter(tp1, currentDate);				
+				tp1.saveAs(filePrefix + ".txt");
+				tp2.saveAs(filePrefix + "_1w.txt");
+				tp3.saveAs(filePrefix + "_1r.txt");
+	//			IJ.saveAsTiff(imp, filePrefix + ".tif");
+				
+				save2DPlot(rawFreqRes, 0, "1st freq (Hz)", filePrefix + "_f1.tif", true, 0.0, sampleRate / 2.0, "Ice");
+				save2DPlot(rawFreqRes, 2, "2nd freq (Hz)", filePrefix + "_f2.tif", true, 0.0, sampleRate / 2.0, "Ice");
+				save2DPlot(rawFreqRes, 1, "power 1", filePrefix + "_f1p.tif", true, 0.0, Double.POSITIVE_INFINITY, "Ice");
+				save2DPlot(rawFreqRes, 3, "power 2", filePrefix + "_f2p.tif", true, 0.0, Double.POSITIVE_INFINITY, "Ice");
+				save2DPlot(rawFreqRes, 4, "com freq (Hz)", filePrefix + "_com.tif", true, 0.0, sampleRate / 4.0, "Ice");
+				save2DPlot(rawFreqRes, 5, "phase of 1st freq (rad)", filePrefix + "_ph1.tif", true, -Math.PI, Math.PI, "Spectrum");
+				save2DPlot(rawFreqRes, 6, "phase of 2nd freq (rad)", filePrefix + "_ph2.tif", true, -Math.PI, Math.PI, "Spectrum");
+	//			save2DPlot(evMapRaw, "eigenvec ph1 (rad)", filePrefix + "_ev1.tif", true, -Math.PI, Math.PI, "Spectrum");
+				saveBooleanAsPlot(signal, "signal region", filePrefix + "_signal.tif");
+				save2DPlot(corrFreqRes, 0, "1st freq (Hz)", filePrefix + "_f1_c.tif", true, lowerLimit, upperLimit, "Ice");
+				save2DPlot(corrFreqRes, 2, "2nd freq (Hz)", filePrefix + "_f2_c.tif", true, lowerLimit, upperLimit, "Ice");
+				save2DPlot(corrFreqRes, 1, "power 1", filePrefix + "_f1p_c.tif", true, 0.0, Double.POSITIVE_INFINITY, "Ice");
+				save2DPlot(corrFreqRes, 3, "power 2", filePrefix + "_f2p_c.tif", true, 0.0, Double.POSITIVE_INFINITY, "Ice");
+				save2DPlot(corrFreqRes, 4, "com freq (Hz)", filePrefix + "_com_c.tif", true, lowerLimit, upperLimit, "Ice");
+				save2DPlot(corrFreqRes, 5, "phase of 1st freq (rad)", filePrefix + "_ph1_c.tif", true, -Math.PI, Math.PI, "Spectrum");
+				save2DPlot(corrFreqRes, 6, "phase of 2nd freq (rad)", filePrefix + "_ph2_c.tif", true, -Math.PI, Math.PI, "Spectrum");
+	//			save2DPlot(evMapCorr, "eigenvec ph1 (rad)", filePrefix + "_ev1_c.tif", true, -Math.PI, Math.PI, "Spectrum");
+				saveBooleanAsPlot(signalPostCorr, "signal region (corr)", filePrefix + "_signal_c.tif");
+				
+				save2DPlot(phaseMapRoiFreqs, 0, "phase at " + locFreqs [0] + " Hz (rad)", filePrefix + "_ph_freq1_r.tif", true, -Math.PI, Math.PI, "Spectrum");
+				save2DPlot(phaseMapRoiFreqs, 1, "phase at " + locFreqs [1] + " Hz (rad)", filePrefix + "_ph_freq2_r.tif", true, -Math.PI, Math.PI, "Spectrum");
+				save2DPlot(phaseMapWholeImpFreqs, 0, "phase at " + locFreqs [2] + " Hz (rad)", filePrefix + "_ph_freq1_w.tif", true, -Math.PI, Math.PI, "Spectrum");
+				save2DPlot(phaseMapWholeImpFreqs, 1, "phase at " + locFreqs [3] + " Hz (rad)", filePrefix + "_ph_freq2_w.tif", true, -Math.PI, Math.PI, "Spectrum");
+				
+				//plot power spectras
+				xValues = new double [(int)(sampleRate/2.0)];
+				yValues = new double [1][(int)(sampleRate/2.0)];
 				for(int i = 0; i < (int)(sampleRate/2.0); i++){
-					yValues [0][i] = assembledPowerSpectrumFromWholeImp[i];
+					xValues [i] = (double)i * sampleRate / (double) powerSpectrumBackground[0].length;
+					yValues [0][i] = powerSpectrumBackground[0][i];
 			 	}
-				plot2DArray(xValues, yValues, "Power Spectrum - entire image", "frequency (Hz)", "power", filePrefix + "_psw", true, new String[]{""});
+				plot2DArray(xValues, yValues, "Power Spectra Background (Mean)", "frequency (Hz)", "power", filePrefix + "_bg_avg", true, new String[]{""});
 				
 				for(int i = 0; i < (int)(sampleRate/2.0); i++){
-					yValues [0][i] = assembledPowerSpectrumFromWholeImpCorr[i];
+					yValues [0][i] = powerSpectrumBackground[1][i];
 			 	}
-				plot2DArray(xValues, yValues, "Power Spectrum - entire image", "frequency (Hz)", "power", filePrefix + "_psw_c", true, new String[]{""});
-			}			
-			
-			if(assembledPowerSpectrumFromRoi != null){
-				for(int i = 0; i < (int)(sampleRate/2.0); i++){
-					yValues [0][i] = assembledPowerSpectrumFromRoi[i];
-			 	}
-				plot2DArray(xValues, yValues, "Power Spectrum - entire roi", "frequency (Hz)", "power", filePrefix + "_psr", true, new String[]{""});	
+				plot2DArray(xValues, yValues, "Power Spectra Background (SD)", "frequency (Hz)", "power", filePrefix + "_bg_sd", true, new String[]{""});
 				
-				for(int i = 0; i < (int)(sampleRate/2.0); i++){
-					yValues [0][i] = assembledPowerSpectrumFromRoiCorr[i];
-			 	}
-				plot2DArray(xValues, yValues, "Power Spectrum - entire roi", "frequency (Hz)", "power", filePrefix + "_psr_c", true, new String[]{""});
-			}
+				if(assembledPowerSpectrumFromWholeImp != null){
+					for(int i = 0; i < (int)(sampleRate/2.0); i++){
+						yValues [0][i] = assembledPowerSpectrumFromWholeImp[i];
+				 	}
+					plot2DArray(xValues, yValues, "Power Spectrum - entire image", "frequency (Hz)", "power", filePrefix + "_psw", true, new String[]{""});
+					
+					for(int i = 0; i < (int)(sampleRate/2.0); i++){
+						yValues [0][i] = assembledPowerSpectrumFromWholeImpCorr[i];
+				 	}
+					plot2DArray(xValues, yValues, "Power Spectrum - entire image", "frequency (Hz)", "power", filePrefix + "_psw_c", true, new String[]{""});
+				}			
+				
+				if(assembledPowerSpectrumFromRoi != null){
+					for(int i = 0; i < (int)(sampleRate/2.0); i++){
+						yValues [0][i] = assembledPowerSpectrumFromRoi[i];
+				 	}
+					plot2DArray(xValues, yValues, "Power Spectrum - entire roi", "frequency (Hz)", "power", filePrefix + "_psr", true, new String[]{""});	
+					
+					for(int i = 0; i < (int)(sampleRate/2.0); i++){
+						yValues [0][i] = assembledPowerSpectrumFromRoiCorr[i];
+				 	}
+					plot2DArray(xValues, yValues, "Power Spectrum - entire roi", "frequency (Hz)", "power", filePrefix + "_psr_c", true, new String[]{""});
+				}
+				
+				re = new RoiEncoder(filePrefix + "_roi");
+				try {
+					re.write(selections [task]);
+				} catch (IOException e) {
+					IJ.error("ROI Manager", e.getMessage());
+				}
 			
-			re = new RoiEncoder(filePrefix + "_roi");
-			try {
-				re.write(selections [task]);
-			} catch (IOException e) {
-				IJ.error("ROI Manager", e.getMessage());
-			}
-		
-		/******************************************************************
-		*** 							Finish							***	
-		*******************************************************************/			
-			{
+			/******************************************************************
+			*** 							Finish							***	
+			*******************************************************************/			
+				{
+					imp.unlock();	
+					if(selectedTaskVariant.equals(taskVariant[1])){
+						imp.changes = false;
+						imp.close();
+					}
+					break running;
+				}
+			}catch(Exception e){
+				String out = "";
+				for(int err = 0; err < e.getStackTrace().length; err++){
+					out += " \n " + e.getStackTrace()[err].toString();
+				}			
+				progress.notifyMessage("Analysis of image " + name[task] + " failed - error message: \n"
+					+ "" + out,ProgressDialog.ERROR);
+
 				imp.unlock();	
 				if(selectedTaskVariant.equals(taskVariant[1])){
 					imp.changes = false;
 					imp.close();
 				}
-				processingDone = true;
 				break running;
-			}				
-		}	
+			}
+		}
+		processingDone = true;
 		progress.updateBarText("finished!");
 		progress.setBar(1.0);
 		progress.moveTask(task);
+		System.gc();
 	}
 }
 private void addFooter(TextPanel tp, Date currentDate){
@@ -1260,6 +1346,53 @@ public static double [] getSignificantFrequenciesWithPowersAndPhases (double [] 
  * SDLimit = 2 -> FDR = 1.7 %
  * SDLimit = 2.5 -> FDR = 0.5 %
  * SDLimit = 3 -> FDR = 0.1 %
+ * 
+ * Function implemented from v0.2.1 on (first time phase is extracted)
+ * */
+public static double [] getPhaseOfSpecificFrequencies (double [] values, double sampleRate, boolean showPlot, boolean normalizePlusMinus, double [] specificFrequencies){
+	//DoubleFFT package from: http://incanter.org/docs/parallelcolt/api/edu/emory/mathcs/jtransforms/fft/DoubleFFT_1D.html
+	DoubleFFT_1D fftDo = new DoubleFFT_1D(values.length);	
+    double [] fft = new double[values.length * 2];
+    double [] phase = new double[values.length];
+    System.arraycopy(values, 0, fft, 0, values.length); 
+    
+    //normalization of values to +/- range
+	if(normalizePlusMinus && tools.getMinimumWithinRange(fft, 0, fft.length-1) >= 0.0){
+		double max = tools.getMaximum(fft)/2.0;
+		for(int i = 0; i < fft.length; i++){
+			fft [i] -= max;
+		}
+	}
+    
+    fftDo.realForwardFull(fft);
+                   
+    double real, imaginary;
+    for(int j = 0; j < values.length; j++){
+    	real = fft[2*j];
+    	imaginary = fft[2*j+1];
+    	phase [j] =  Math.atan2(imaginary, real);
+    }
+    
+    //display as plot
+    if(showPlot)	tools.showAsPlot(phase);
+
+  	double phases [] = new double [specificFrequencies.length];
+  	for(int i = 0; i < specificFrequencies.length; i++) {
+  		if(specificFrequencies [i] <= 0.0) continue;
+		phases [i] = phase [(int) Math.round(specificFrequencies [i] / sampleRate * (double) values.length)];
+	}
+  	
+    return phases;
+}
+
+
+
+/**
+ * Only considers peaks above average + SDLimit*SD of power Spectrum Background 
+ * SDLimit = 1.5 -> FDR = 4.4 %
+ * SDLimit = 2 -> FDR = 1.7 %
+ * SDLimit = 2.5 -> FDR = 0.5 %
+ * SDLimit = 3 -> FDR = 0.1 %
  * */
 public static double [] getAboveMinimumFrequenciesWithPowers (double [] values, double sampleRate, boolean showPlot, boolean normalizePlusMinus, double [] powerSpectrumMinima,
 		double lowerLimit, double upperLimit){
@@ -1340,8 +1473,8 @@ public static void save2DPlot(double [][][] output, int index3rdDim, String unit
 		min = 10.0*(double)((int)(min/10.0));
 		ticks = true;
 	}else{
-		max = (double)((int)max+1);
-		min = (double)((int)min);
+//		max = (double)((int)max+1);
+//		min = (double)((int)min);
 	}	
 	
 	ImagePlus impOut = IJ.createImage("Output image", output.length, output[0].length + 20, 1, 8);
@@ -1409,15 +1542,15 @@ public static void save2DPlot(double [][][] output, int index3rdDim, String unit
 	}
 	
 	impOut.getImage().getGraphics().setFont(RoiFont);
-	impOut.getImage().getGraphics().drawString(constants.df1US.format(min), 
+	impOut.getImage().getGraphics().drawString(df1US.format(min), 
 			(int)Math.round(2), 
 		(int)Math.round( output[0].length + 18));
 	
 	TextRoi txtID = new TextRoi((int)Math.round(output.length), 
 			(int)Math.round(output[0].length + 18),
-			constants.df1US.format(max),
+			df1US.format(max),
 			RoiFont);	
-	impOut.getImage().getGraphics().drawString(constants.df1US.format(max), 
+	impOut.getImage().getGraphics().drawString(df1US.format(max), 
 			(int)Math.round(output.length)-txtID.getBounds().width-2, 
 			(int)Math.round(output[0].length + 18));
 				
@@ -2061,7 +2194,6 @@ static double [][] getEigenvectorsFromAMatrix (double inMatrix [][]) {
 }
 
 static double [][] getEigenVectorMap(double [][][] data, int component, int nonZeroComponentForCheck){
-	/*TODO: add function to correct values that are more distant than pi*/
 	double map [][] = new double [data.length][data[0].length];
 	double matrix [][] = new double [3][3];
 	double ev [][];
