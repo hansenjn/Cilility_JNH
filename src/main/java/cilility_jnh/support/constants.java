@@ -33,9 +33,11 @@ public class constants {
 	//Decimal formats
 	public static final DecimalFormat df6US = new DecimalFormat("#0.000000");
 	public static final DecimalFormat df3US = new DecimalFormat("#0.000");
+	public static final DecimalFormat df1US = new DecimalFormat("#0.0");
 	public static final DecimalFormat df0 = new DecimalFormat("#0");
 	public static final DecimalFormat df6GER = new DecimalFormat("#0,000000");
 	public static final DecimalFormat df3GER = new DecimalFormat("#0,000");
+	public static final DecimalFormat df1GER= new DecimalFormat("#0,0");
 	public static final DecimalFormat dfdialog = new DecimalFormat("#0.000000");
 	
 	//Date formats

@@ -11,7 +11,7 @@
  
  	<artifactId>Cilility_JNH</artifactId>  
  	<groupId>JNH</groupId>
-    <version>0.1.1-SNAPSHOT</version>
+    <version>0.2.1-SNAPSHOT</version>
  
 <!-- Plugin Information -->
     <name>Cilility</name>
@@ -98,8 +98,13 @@
             <groupId>net.imagej</groupId>
             <artifactId>ij</artifactId>
         </dependency>
+        
+        <!-- Math3 is licensed under license Apache 2.0 -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-math3</artifactId>
+        </dependency>
     </dependencies>  
-    
     <build>
 <!--        <directory>target</directory> -->
 <!--     	<outputDirectory>target/classes</outputDirectory> -->

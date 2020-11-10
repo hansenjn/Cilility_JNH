@@ -1,6 +1,6 @@
 package cilility_jnh;
 /** ===============================================================================
-* Cilility_JNH.java Version 0.1.1
+* Cilility_JNH.java Version 0.2.1
 * 
 * This program is free software; you can redistribute it and/or
 * modify it under the terms of the GNU General Public License
@@ -14,7 +14,7 @@ package cilility_jnh;
 * See the GNU General Public License for more details.
 *  
 * Copyright (C) Jan Niklas Hansen
-* Date: June 13, 2019 (This Version: August 28, 2020)
+* Date: June 13, 2019 (This Version: November 10, 2020)
 *   
 * For any questions please feel free to contact me (jan.hansen@uni-bonn.de).
 * =============================================================================== */
@@ -35,10 +35,12 @@ import ij.plugin.*;
 import ij.process.ImageConverter;
 import ij.text.*;
 
+import org.apache.commons.math3.linear.*;
+
 public class CililityMain implements PlugIn, Measurements {
 	//Name variables
 	static final String PLUGINNAME = "Cilility_JNH";
-	static final String PLUGINVERSION = "0.1.1";
+	static final String PLUGINVERSION = "0.2.1";
 	
 	//Fix fonts
 	static final Font SuperHeadingFont = new Font("Sansserif", Font.BOLD, 16);
@@ -304,7 +306,7 @@ public void run(String arg) {
 		   			for(int i = 0; i < imp.getStackSize(); i++){
 		   				valueColumn [i] = imp.getStack().getVoxel(x, y, i);
 		   			}
-		   			rawFreqRes[x][y] = getFrequenciesWithPower(valueColumn, sampleRate, false, true, smoothWindowSize, lowerLimit, upperLimit);
+		   			rawFreqRes[x][y] = getFrequenciesWithPowerAndPhase(valueColumn, sampleRate, false, true, smoothWindowSize, lowerLimit, upperLimit);
 			   	}	
 		   	}
 		   	
@@ -322,7 +324,7 @@ public void run(String arg) {
 		   			for(int i = 0; i < imp.getStackSize(); i++){
 		   				valueColumn [i] = imp.getStack().getVoxel(x, y, i);
 		   			}
-		   			corrFreqRes[x][y] = getSignificantFrequenciesWithPowers(valueColumn, sampleRate, false, true, powerSpectrumBackground, limitSD, lowerLimit, upperLimit, smoothWindowSize);
+		   			corrFreqRes[x][y] = getSignificantFrequenciesWithPowersAndPhases(valueColumn, sampleRate, false, true, powerSpectrumBackground, limitSD, lowerLimit, upperLimit, smoothWindowSize);
 //		   			outputCorr[x][y] = getAboveMinimumFrequenciesWithPowers(valueColumn, sampleRate, false, true, powerSpectrumMinimum, lowerLimit, upperLimit);
 			   	}	
 		   	}
@@ -542,6 +544,12 @@ public void run(String arg) {
 			    	wholeImpCorrSharp [1] = 0.0;
 			    }		   	
 			}
+			
+			// GET EIGENVECTOR MAP
+			progress.updateBarText("get eigentvector map - raw frequency results...");
+			double [][] evMapRaw = getEigenVectorMap(rawFreqRes, 5, 0);
+			progress.updateBarText("get eigentvector map - corrected frequency results...");
+			double [][] evMapCorr = getEigenVectorMap(corrFreqRes, 5, 0);
 		   	
 	   	/******************************************************************
 		*** 							Output							***	
@@ -839,17 +847,23 @@ public void run(String arg) {
 			tp3.saveAs(filePrefix + "_1r.txt");
 //			IJ.saveAsTiff(imp, filePrefix + ".tif");
 			
-			save2DPlot(rawFreqRes, 0, "1st freq (Hz)", filePrefix + "_f1.tif", true, 0.0, sampleRate / 2.0);
-			save2DPlot(rawFreqRes, 2, "2nd freq (Hz)", filePrefix + "_f2.tif", true, 0.0, sampleRate / 2.0);
-			save2DPlot(rawFreqRes, 1, "power 1", filePrefix + "_f1p.tif", true, 0.0, Double.POSITIVE_INFINITY);
-			save2DPlot(rawFreqRes, 3, "power 2", filePrefix + "_f2p.tif", true, 0.0, Double.POSITIVE_INFINITY);
-			save2DPlot(rawFreqRes, 4, "com freq (Hz)", filePrefix + "_com.tif", true, 0.0, sampleRate / 4.0);
+			save2DPlot(rawFreqRes, 0, "1st freq (Hz)", filePrefix + "_f1.tif", true, 0.0, sampleRate / 2.0, "Ice");
+			save2DPlot(rawFreqRes, 2, "2nd freq (Hz)", filePrefix + "_f2.tif", true, 0.0, sampleRate / 2.0, "Ice");
+			save2DPlot(rawFreqRes, 1, "power 1", filePrefix + "_f1p.tif", true, 0.0, Double.POSITIVE_INFINITY, "Ice");
+			save2DPlot(rawFreqRes, 3, "power 2", filePrefix + "_f2p.tif", true, 0.0, Double.POSITIVE_INFINITY, "Ice");
+			save2DPlot(rawFreqRes, 4, "com freq (Hz)", filePrefix + "_com.tif", true, 0.0, sampleRate / 4.0, "Ice");
+			save2DPlot(rawFreqRes, 5, "phase 1 (rad)", filePrefix + "_ph1.tif", true, -Math.PI, Math.PI, "Spectrum");
+			save2DPlot(rawFreqRes, 6, "phase 2 (rad)", filePrefix + "_ph2.tif", true, -Math.PI, Math.PI, "Spectrum");
+			save2DPlot(evMapRaw, "eigenvec ph1 (rad)", filePrefix + "_ev1.tif", true, -Math.PI, Math.PI, "Spectrum");
 			saveBooleanAsPlot(signal, "signal region", filePrefix + "_signal.tif");
-			save2DPlot(corrFreqRes, 0, "1st freq (Hz)", filePrefix + "_f1_c.tif", true, lowerLimit, upperLimit);
-			save2DPlot(corrFreqRes, 2, "2nd freq (Hz)", filePrefix + "_f2_c.tif", true, lowerLimit, upperLimit);
-			save2DPlot(corrFreqRes, 1, "power 1", filePrefix + "_f1p_c.tif", true, 0.0, Double.POSITIVE_INFINITY);
-			save2DPlot(corrFreqRes, 3, "power 2", filePrefix + "_f2p_c.tif", true, 0.0, Double.POSITIVE_INFINITY);
-			save2DPlot(corrFreqRes, 4, "com freq (Hz)", filePrefix + "_com_c.tif", true, lowerLimit, upperLimit);
+			save2DPlot(corrFreqRes, 0, "1st freq (Hz)", filePrefix + "_f1_c.tif", true, lowerLimit, upperLimit, "Ice");
+			save2DPlot(corrFreqRes, 2, "2nd freq (Hz)", filePrefix + "_f2_c.tif", true, lowerLimit, upperLimit, "Ice");
+			save2DPlot(corrFreqRes, 1, "power 1", filePrefix + "_f1p_c.tif", true, 0.0, Double.POSITIVE_INFINITY, "Ice");
+			save2DPlot(corrFreqRes, 3, "power 2", filePrefix + "_f2p_c.tif", true, 0.0, Double.POSITIVE_INFINITY, "Ice");
+			save2DPlot(corrFreqRes, 4, "com freq (Hz)", filePrefix + "_com_c.tif", true, lowerLimit, upperLimit, "Ice");
+			save2DPlot(corrFreqRes, 5, "phase 1 (rad)", filePrefix + "_ph1_c.tif", true, -Math.PI, Math.PI, "Spectrum");
+			save2DPlot(corrFreqRes, 6, "phase 2 (rad)", filePrefix + "_ph2_c.tif", true, -Math.PI, Math.PI, "Spectrum");
+			save2DPlot(evMapCorr, "eigenvec ph1 (rad)", filePrefix + "_ev1_c.tif", true, -Math.PI, Math.PI, "Spectrum");
 			saveBooleanAsPlot(signalPostCorr, "signal region (corr)", filePrefix + "_signal_c.tif");
 			
 			//plot power spectras
@@ -988,6 +1002,76 @@ private static double [] getFrequenciesWithPower (double [] values, double sampl
    }
 }
 
+/**
+ * Introduced in version v0.2.1 to extract the phase
+ * @returns a one-dimensional double array containing (in the order as follows): frequency of first peak, amplitude of first peak, freq of second peak, amplitude of second peak,
+ * 	centre of mass of frequency spectrum, phase of first peak, phase of second peak.
+ * 
+ * */
+private static double [] getFrequenciesWithPowerAndPhase (double [] values, double sampleRate, boolean showPlot, 
+		boolean normalizePlusMinus, int smoothWindowSize, double lowerLimit, double upperLimit){
+	//DoubleFFT package from: http://incanter.org/docs/parallelcolt/api/edu/emory/mathcs/jtransforms/fft/DoubleFFT_1D.html
+	DoubleFFT_1D fftDo = new DoubleFFT_1D(values.length);	
+    double [] fft = new double[values.length * 2];
+    double [] magnitude = new double[values.length];
+    double [] phase = new double[values.length];
+    System.arraycopy(values, 0, fft, 0, values.length); 
+    
+    //normalization of values to +/- range
+  		if(normalizePlusMinus && tools.getMinimumWithinRange(fft, 0, fft.length-1) >= 0.0){
+  			double max = tools.getMaximum(fft)/2.0;
+  			for(int i = 0; i < fft.length; i++){
+  				fft [i] -= max;
+  			}
+  		}
+    
+    fftDo.realForwardFull(fft);
+                   
+    double real, imaginary;
+    for(int j = 0; j < values.length; j++){
+    	real = fft[2*j];
+    	imaginary = fft[2*j+1];
+    	phase [j] =  Math.atan2(imaginary, real);
+    	magnitude [j] = Math.sqrt(real*real+imaginary*imaginary) / magnitude.length;
+    }
+    
+    //TODO smooth magnitude
+    magnitude = smooth(magnitude, smoothWindowSize);
+    
+    //display as plot
+    if(showPlot)	tools.showAsPlot(magnitude);
+    
+    //output maximum frequencies and respective powers (from index 2 on)	//TODO
+//  int [] freqs = tools.get2HighestMaximaIndicesWithinRange(magnitude, (int)Math.round(2*(magnitude.length/sampleRate)), (magnitude.length/2));
+    int [] freqs = tools.get2HighestMaximaIndicesWithinRange(magnitude,
+    		(int)Math.round(lowerLimit*(magnitude.length/sampleRate)), 
+		(int)Math.round(upperLimit*(magnitude.length/sampleRate)));
+    double [] ampl = new double [2];
+    double [] phases = new double [2];
+    double com = tools.getCenterOfMassOfRange(magnitude, 0, (magnitude.length/2)-1);
+    if(freqs[0] >= 0 && freqs [0] < magnitude.length){
+    	ampl [0] = magnitude [freqs[0]];
+    	phases [0] = phase[freqs[0]];
+    }else{
+    	ampl [0] = 0.0;
+    }
+    if(freqs[1] >= 0 && freqs [1] < magnitude.length){
+    	ampl [1] = magnitude [freqs[1]];
+    	phases [1] = phase[freqs[1]];
+    }else{
+    	ampl [1] = 0.0;
+    }
+    if(freqs [0] < freqs [1]){
+   	 return new double [] {freqs [0] * sampleRate / magnitude.length, ampl [0],
+   	    		freqs [1] * sampleRate / magnitude.length, ampl [1], com * sampleRate / magnitude.length,
+   	    		phases [0], phases [1]};
+    }else{
+   	 return new double [] {freqs [1] * sampleRate / magnitude.length, ampl [1],
+   	    		freqs [0] * sampleRate / magnitude.length, ampl [0], com * sampleRate / magnitude.length,
+	    		phases [1], phases [0]};
+   }
+}
+
 public static double [] getFrequencySpectrum (double [] values, boolean showPlot, boolean normalizePlusMinus, int smoothWindowSize){
 	//DoubleFFT package from: http://incanter.org/docs/parallelcolt/api/edu/emory/mathcs/jtransforms/fft/DoubleFFT_1D.html
 	DoubleFFT_1D fftDo = new DoubleFFT_1D(values.length);	
@@ -1096,6 +1180,86 @@ public static double [] getSignificantFrequenciesWithPowers (double [] values, d
  * SDLimit = 2 -> FDR = 1.7 %
  * SDLimit = 2.5 -> FDR = 0.5 %
  * SDLimit = 3 -> FDR = 0.1 %
+ * 
+ * Function implemented from v0.2.1 on (first time phase is extracted)
+ * */
+public static double [] getSignificantFrequenciesWithPowersAndPhases (double [] values, double sampleRate, boolean showPlot, boolean normalizePlusMinus, double [][] powerSpectrumBackground, 
+		double SDLimit, double lowerLimit, double upperLimit, int smoothWindowSize){
+	//DoubleFFT package from: http://incanter.org/docs/parallelcolt/api/edu/emory/mathcs/jtransforms/fft/DoubleFFT_1D.html
+	DoubleFFT_1D fftDo = new DoubleFFT_1D(values.length);	
+    double [] fft = new double[values.length * 2];
+    double [] magnitude = new double[values.length];
+    double [] phase = new double[values.length];
+    System.arraycopy(values, 0, fft, 0, values.length); 
+    
+    //normalization of values to +/- range
+  		if(normalizePlusMinus && tools.getMinimumWithinRange(fft, 0, fft.length-1) >= 0.0){
+  			double max = tools.getMaximum(fft)/2.0;
+  			for(int i = 0; i < fft.length; i++){
+  				fft [i] -= max;
+  			}
+  		}
+    
+    fftDo.realForwardFull(fft);
+                   
+    double real, imaginary;
+    boolean somethingRemains = false;
+    for(int j = 0; j < values.length; j++){
+    	real = fft[2*j];
+    	imaginary = fft[2*j+1];
+    	phase [j] =  Math.atan2(imaginary, real);
+    	magnitude [j] = Math.sqrt(real*real+imaginary*imaginary) / magnitude.length;
+    	magnitude [j] -= powerSpectrumBackground [0][j] + SDLimit * powerSpectrumBackground [1][j]; 
+    	if(magnitude [j] < 0.0){
+    		magnitude [j] = 0.0;
+    	}else{    		
+    		somethingRemains = true;
+    	}
+    }    
+    if(!somethingRemains)	return new double [] {0.0, 0.0, 0.0, 0.0, 0.0};
+    magnitude = smooth(magnitude, smoothWindowSize);
+    
+    //display as plot
+    if(showPlot)	tools.showAsPlot(magnitude);
+    
+    //output maximum frequencies and respective powers (from index 2 on)	//TODO
+//    int [] freqs = tools.get2HighestMaximaIndicesWithinRange(magnitude, (int)Math.round(2*(magnitude.length/sampleRate)), (magnitude.length/2));
+    int [] freqs = tools.get2HighestMaximaIndicesWithinRange(magnitude,
+    		(int)Math.round(lowerLimit*(magnitude.length/sampleRate)), 
+		(int)Math.round(upperLimit*(magnitude.length/sampleRate)));
+    double [] ampl = new double [2];
+    double [] phases = new double [2];
+    double com = tools.getCenterOfMassOfRange(magnitude, 0, (magnitude.length/2)-1);
+    if(freqs[0] >= 0 && freqs [0] < magnitude.length){
+    	ampl [0] = magnitude [freqs[0]] + powerSpectrumBackground [0][freqs[0]] + SDLimit * powerSpectrumBackground [1][freqs[0]];
+    	phases [0] = phase[freqs[0]];
+    }else{
+    	ampl [0] = 0.0;
+    }
+    if(freqs[1] >= 0 && freqs [1] < magnitude.length){
+    	ampl [1] = magnitude [freqs[1]] + powerSpectrumBackground [0][freqs[1]] + SDLimit * powerSpectrumBackground [1][freqs[1]];
+    	phases [1] = phase[freqs[1]];
+    }else{
+    	ampl [1] = 0.0;
+    }
+    if(freqs [0] < freqs [1]){
+    	 return new double [] {freqs [0] * sampleRate / magnitude.length, ampl [0],
+    	    		freqs [1] * sampleRate / magnitude.length, ampl [1], com * sampleRate / magnitude.length,
+    	    		phases [0], phases [1]};
+    }else{
+    	 return new double [] {freqs [1] * sampleRate / magnitude.length, ampl [1],
+    	    		freqs [0] * sampleRate / magnitude.length, ampl [0], com * sampleRate / magnitude.length,
+    	    		phases [1], phases [0]};
+    }
+   
+}
+
+/**
+ * Only considers peaks above average + SDLimit*SD of power Spectrum Background 
+ * SDLimit = 1.5 -> FDR = 4.4 %
+ * SDLimit = 2 -> FDR = 1.7 %
+ * SDLimit = 2.5 -> FDR = 0.5 %
+ * SDLimit = 3 -> FDR = 0.1 %
  * */
 public static double [] getAboveMinimumFrequenciesWithPowers (double [] values, double sampleRate, boolean showPlot, boolean normalizePlusMinus, double [] powerSpectrumMinima,
 		double lowerLimit, double upperLimit){
@@ -1154,7 +1318,7 @@ public static double [] getAboveMinimumFrequenciesWithPowers (double [] values, 
     		freqs [1] * sampleRate / magnitude.length, ampl [1], com * sampleRate / magnitude.length};
 }
 
-public static void save2DPlot(double [][][] output, int index3rdDim, String unit, String savePath, boolean ignoreZero, double lowerLimit, double upperLimit){
+public static void save2DPlot(double [][][] output, int index3rdDim, String unit, String savePath, boolean ignoreZero, double lowerLimit, double upperLimit, String usedLUT){
 	double max = Double.NEGATIVE_INFINITY;
 	double min = Double.POSITIVE_INFINITY;
 	for(int x = 0; x < output.length; x++){
@@ -1197,7 +1361,7 @@ public static void save2DPlot(double [][][] output, int index3rdDim, String unit
 		impOut.getStack().setVoxel(x, output[0].length + 3, 0, (255.0*(double)x/(double)output.length));
 		impOut.getStack().setVoxel(x, output[0].length + 4, 0, (255.0*(double)x/(double)output.length));
 	}	
-	IJ.run(impOut, "Ice", "");
+	IJ.run(impOut, usedLUT, "");
 	
 	convertToRGB(impOut);
 	
@@ -1245,15 +1409,129 @@ public static void save2DPlot(double [][][] output, int index3rdDim, String unit
 	}
 	
 	impOut.getImage().getGraphics().setFont(RoiFont);
-	impOut.getImage().getGraphics().drawString(constants.df0.format(min), 
+	impOut.getImage().getGraphics().drawString(constants.df1US.format(min), 
 			(int)Math.round(2), 
 		(int)Math.round( output[0].length + 18));
 	
 	TextRoi txtID = new TextRoi((int)Math.round(output.length), 
 			(int)Math.round(output[0].length + 18),
-			constants.df0.format(max),
+			constants.df1US.format(max),
 			RoiFont);	
-	impOut.getImage().getGraphics().drawString(constants.df0.format(max), 
+	impOut.getImage().getGraphics().drawString(constants.df1US.format(max), 
+			(int)Math.round(output.length)-txtID.getBounds().width-2, 
+			(int)Math.round(output[0].length + 18));
+				
+	txtID = new TextRoi((int)Math.round(output.length/2.0), 
+			(int)Math.round(output[0].length + 18),
+			unit,
+			RoiFont);
+	impOut.getImage().getGraphics().drawString(unit, 
+		(int)Math.round((double)(output.length-txtID.getBounds().width)/2.0)-2, 
+		(int)Math.round(output[0].length + 18));
+		
+	IJ.saveAsTiff(impOut, savePath);
+}
+
+public static void save2DPlot(double [][] output, String unit, String savePath, boolean ignoreZero, double lowerLimit, double upperLimit, String usedLUT){
+	double max = Double.NEGATIVE_INFINITY;
+	double min = Double.POSITIVE_INFINITY;
+	for(int x = 0; x < output.length; x++){
+		for(int y = 0; y < output[x].length; y++){
+			if(ignoreZero && output[x][y] == 0.0)	continue;
+			if(output[x][y] > upperLimit)	continue;
+			if(output[x][y] < lowerLimit)	continue;
+	   		if(output[x][y] > max){
+	   			max = output[x][y]; 
+	   		}
+	   		if(output[x][y] < min){
+	   			min = output[x][y]; 
+	   		}
+		}
+	}
+	boolean ticks = false;
+	if(max-min>10){
+		max = 10.0*(double)((int)(max/10.0)+1);
+		min = 10.0*(double)((int)(min/10.0));
+		ticks = true;
+	}else{
+		max = (double)((int)max+1);
+		min = (double)((int)min);
+	}	
+	
+	ImagePlus impOut = IJ.createImage("Output image", output.length, output[0].length + 20, 1, 8);
+	for(int x = 0; x < output.length; x++){
+		for(int y = 0; y < output[x].length; y++){
+			if(ignoreZero && output[x][y] == 0.0)	continue;
+			if(output[x][y] > upperLimit)	continue;
+			if(output[x][y] < lowerLimit)	continue;
+			
+			impOut.getStack().setVoxel(x, y, 0, (255.0*(output[x][y]-min)/(max-min)));
+		}
+	}
+	
+	//write bar	
+	for(int x = 0; x < output.length; x++){
+		impOut.getStack().setVoxel(x, output[0].length + 2, 0, (255.0*(double)x/(double)output.length));
+		impOut.getStack().setVoxel(x, output[0].length + 3, 0, (255.0*(double)x/(double)output.length));
+		impOut.getStack().setVoxel(x, output[0].length + 4, 0, (255.0*(double)x/(double)output.length));
+	}	
+	IJ.run(impOut, usedLUT, "");
+	
+	convertToRGB(impOut);
+	
+	for(int x = 0; x < output.length; x++){
+		for(int y = output[0].length; y < output[0].length + 20; y++){
+			if(y == output[0].length + 2)	continue;
+			if(y == output[0].length + 3)	continue;
+			if(y == output[0].length + 4)	continue;
+			impOut.setC(0);
+			impOut.getStack().setVoxel(x, y, 0, 0.0);
+			impOut.setC(1);
+			impOut.getStack().setVoxel(x, y, 0, 0.0);
+			impOut.setC(2);
+			impOut.getStack().setVoxel(x, y, 0, 0.0);
+		}
+	}
+	
+	for(int x = 0; x < output.length; x++){
+		for(int y = 0; y < output[x].length; y++){
+			if(ignoreZero && output[x][y] == 0.0){				
+			}else if(output[x][y] > upperLimit){
+			}else if(output[x][y] < lowerLimit){
+			}else{
+				continue;
+			}			
+			impOut.setC(0);
+			impOut.getStack().setVoxel(x, y, 0, 0.0);
+			impOut.setC(1);
+			impOut.getStack().setVoxel(x, y, 0, 0.0);
+			impOut.setC(2);
+			impOut.getStack().setVoxel(x, y, 0, 0.0);
+		}
+	}
+	
+
+	impOut.getImage().getGraphics().setColor(Color.WHITE);
+	if(ticks){
+		for(int i = (int)min; i <= (int)max; i++){
+			if(i%10==0){
+				impOut.getImage().getGraphics().drawLine((int)Math.round(output.length*(i-min)/(max-min)),
+						output[0].length + 4, (int)Math.round(output.length*(i-min)/(max-min)),
+						output[0].length + 5);				
+			}
+		}
+	}
+	
+	impOut.getImage().getGraphics().setFont(RoiFont);
+	impOut.getImage().getGraphics().drawString(constants.df1US.format(min), 
+			(int)Math.round(2), 
+		(int)Math.round( output[0].length + 18));
+	
+	TextRoi txtID = new TextRoi((int)Math.round(output.length), 
+			(int)Math.round(output[0].length + 18),
+			constants.df1US.format(max),
+			RoiFont);	
+	impOut.getImage().getGraphics().drawString(constants.df1US.format(max), 
 			(int)Math.round(output.length)-txtID.getBounds().width-2, 
 			(int)Math.round(output[0].length + 18));
 				
@@ -1408,8 +1686,8 @@ private static boolean [][] getSignalRegionsBySD(double [][][] frequencies, doub
 	int counter;
 	double SD;
 	
-	for(int x = 2; x < output.length-2; x++){
-		for(int y = 2; y < output[x].length-2; y++){
+	for(int x = 1; x < output.length-1; x++){
+		for(int y = 1; y < output[x].length-1; y++){
 			counter = 0;
 			Arrays.fill(values, 0.0);
 			for(int ix = x-1; ix < x+2; ix++){
@@ -1420,31 +1698,51 @@ private static boolean [][] getSignalRegionsBySD(double [][][] frequencies, doub
 					}					
 				}
 			}
-			values [counter] = frequencies[x-2][y][0];
-			if(values[counter]>0.0){
-				counter++;
+			
+			if(x-2 >= 0) {
+				values [counter] = frequencies[x-2][y][0];
+				if(values[counter]>0.0){
+					counter++;
+				}
 			}
-			values [counter] = frequencies[x+2][y][0];
-			if(values[counter]>0.0){
-				counter++;
+			
+			if(x+2 < frequencies.length) {
+				values [counter] = frequencies[x+2][y][0];
+				if(values[counter]>0.0){
+					counter++;
+				}
 			}
-			values [counter] = frequencies[x][y-2][0];
-			if(values[counter]>0.0){
-				counter++;
+			
+			if(y-2 >= 0) {
+				values [counter] = frequencies[x][y-2][0];
+				if(values[counter]>0.0){
+					counter++;
+				}
 			}
-			values [counter] = frequencies[x][y+2][0];
-			if(values[counter]>0.0){
-				counter++;
+			
+			if(y+2 < frequencies[0].length) {
+				values [counter] = frequencies[x][y+2][0];
+				if(values[counter]>0.0){
+					counter++;
+				}
 			}
-			if(counter<9){
+			
+			if(counter<6){
 				continue;
 			}else if(counter == 13){
 				valueRange = values;
 			}else{
-				Arrays.sort(values);
-				valueRange = Arrays.copyOfRange(values, values.length-counter-1, values.length-1);
+//				IJ.log("counter go: " + counter);
+				valueRange = Arrays.copyOfRange(values, 0, counter);
+//				for(int vr = 0; vr < values.length; vr++) {
+//					IJ.log("" + values[vr]);
+//				}
+//				for(int vr = 0; vr < valueRange.length; vr++) {
+//					IJ.log("vr: " + valueRange[vr]);
+//				}
 			}			
 			SD = tools.getSD(valueRange);
+//			IJ.log("SD: " + SD);
 			if(SD < SDThreshold){
 				for(int ix = x-1; ix < x+2; ix++){
 					for(int iy = y-1; iy < y+2; iy++){
@@ -1463,9 +1761,9 @@ private static boolean [][] getSignalRegionsByPowerThreshold(double [][][] frequ
 		Arrays.fill(output [x], false);
 	}
 	
-	for(int x = 2; x < output.length-2; x++){
-		for(int y = 2; y < output [x].length-2; y++){
-			if(frequencies [x][y][0] >= PowerThreshold){
+	for(int x = 0; x < output.length; x++){
+		for(int y = 0; y < output [x].length; y++){
+			if(frequencies [x][y][1] >= PowerThreshold){
 				output [x][y] = true;
 			}
 		}
@@ -1743,4 +2041,49 @@ private static void plot2DArray(double xValues [], double [][] array, String lab
 	p.dispose();			
  	System.gc();
 }
+
+/**
+ * @returns the first three Eigenvectors from a matrix
+ * */
+static double [][] getEigenvectorsFromAMatrix (double inMatrix [][]) {
+	RealMatrix matrix = MatrixUtils.createRealMatrix(inMatrix.length,inMatrix[0].length);
+	for(int i = 0; i < inMatrix.length; i++) {
+		matrix.setColumn(i,inMatrix[i]);
+	}
+	final EigenDecomposition ed = new EigenDecomposition(matrix);
+	
+	double [][] vectors = new double [3][3];
+	vectors [0] = new double []{ed.getEigenvector(0).getEntry(0),ed.getEigenvector(0).getEntry(1),ed.getEigenvector(0).getEntry(2)};
+	vectors [1] = new double [] {ed.getEigenvector(1).getEntry(0),ed.getEigenvector(1).getEntry(1),ed.getEigenvector(1).getEntry(2)};
+	vectors [2] = new double [] {ed.getEigenvector(1).getEntry(0),ed.getEigenvector(1).getEntry(1),ed.getEigenvector(1).getEntry(2)};
+//	
+	return vectors;
+}
+
+static double [][] getEigenVectorMap(double [][][] data, int component, int nonZeroComponentForCheck){
+	/*TODO: add function to correct values that are more distant than pi*/
+	double map [][] = new double [data.length][data[0].length];
+	double matrix [][] = new double [3][3];
+	double ev [][];
+	for(int x = 1; x < data.length-1; x++){
+   		doY: for(int y = 1; y < data[0].length-1; y++){
+
+   			for(int xi = x-1; xi < x+2; xi++) {
+   				for(int yi = y-1; yi < y+2; yi++) {
+   					if(data [xi][yi][nonZeroComponentForCheck]==0.0) {
+   						continue doY;
+   					}
+   	   				matrix [xi-(x-1)][yi-(y-1)] = data [xi][yi][component];
+   	   			}
+   			}
+   			
+   			ev = getEigenvectorsFromAMatrix(matrix);
+   			
+   			map [x][y] = tools.getAbsoluteAngle(new double [] {ev[0][0],ev[0][1]}, constants.X_AXIS);
+   		}
+	}
+	return map;
+}
+
+
 }//end main class
