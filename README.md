@@ -3,7 +3,7 @@
 </p>
 
 # Cilility_JNH
-An ImageJ plugin to analyze ciliary beating from Time-lapse 2D images of multi-ciliated cells, e.g. acquired with a bright-field or phase-contrast microscope. Download the latest release [here](https://github.com/hansenjn/Cilility_JNH/releases).
+An ImageJ plugin to analyze ciliary beating from time-lapse 2D images of multi-ciliated cells, e.g. acquired with a bright-field or phase-contrast microscope. Download the latest release [here](https://github.com/hansenjn/Cilility_JNH/releases).
 
 Copyright (C) 2019-2021: Jan N. Hansen
 
@@ -16,7 +16,7 @@ The newly developed software is licensed under GNU General Public License v3.0. 
 - edu.emory.mathcs.jtransforms.fft\DoubleFFT_1D.java & edu.emory.mathcs.utils\ConcurrencyUtils.java (MPL 1.1/GPL 2.0/LGPL 2.1, Mozilla Public License Version 1.1, author: Piotr Wendykier)
 
 ## Plugin description
-This ImageJ plugin extracts periodic changes of pixel intensity evoked by ciliary beating. . These periodic changes are converted into the frequency domain using Fast Fourier Transformation. The resulting power spectrum is further analyzed. Among many other parameters the plugin extracts the ciliary beat frequency.
+This ImageJ plugin extracts periodic changes of pixel intensity evoked by ciliary beating. These periodic changes are further analyzed using a Fast Fourier Transformation. Among other parameters the plugin determines the ciliary beat frequency.
 
 More descriptions on the underlying algorithms and output parameters will soon be made available here in the [main Cilility github repository](https://github.com/hansenjn/Cilility_JNH/).
 
@@ -29,8 +29,8 @@ Olstad, E.W., Ringers, C., et al. **2019**. Ciliary Beating Compartmentalizes Ce
 A user guide will soon be available here in the [main Cilility github repository](https://github.com/hansenjn/Cilility_JNH/). Until then, please contact jan.hansen(at)uni-bonn.de for help on using Cilility.
 
 ### Software requirements
-Cilility is a plugin for the open-source software ImageJ and thus, requires the installation of ImageJ to your computer ([Download page for ImageJ](https://imagej.net/Downloads)). If you aim to directly analyze microscopy file formats, you may consider installing FIJI instead ([Download page for FIJI](https://fiji.sc/)). FIJI is an ImageJ program with preinstalled plugins, also including a plugin to read images directly from microscopy files (e.g. image files ending with .nd2 from a Nikon, .czi from a Zeiss, or .lif from a Leica microscope).
+Cilility is a plugin for the open-source software ImageJ and thus, requires the installation of ImageJ to your computer ([Download page for ImageJ](https://imagej.net/Downloads)). If you aim to directly analyze microscopy file formats, you may consider installing FIJI instead ([Download page for FIJI](https://fiji.sc/)). FIJI is an ImageJ program with preinstalled plugins, also including a plugin to read images directly from microscopy files (e.g. image files ending with .nd2, .czi, or .lif).
 
 ## Staying up-to-date
 The most recent information and latest updates on the software are available through the main github repository for Cilility: 
-https://github.com/hansenjn/Cilility_JNH
+https://github.com/hansenjn/Cilility_JNH.
