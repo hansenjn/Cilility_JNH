@@ -5,7 +5,7 @@
 # Cilility_JNH
 An ImageJ plugin to analyze ciliary beating from time-lapse 2D images of multi-ciliated cells, e.g. acquired with a bright-field or phase-contrast microscope. Download the latest release [here](https://github.com/hansenjn/Cilility_JNH/releases).
 
-All releases of this software are archived on zenodo via the DOI: <a href="https://doi.org/10.5281/zenodo.5138072"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.5138071.svg" alt="DOI"></a>
+All releases of this software are archived on zenodo via the DOI: <a href="https://doi.org/10.5281/zenodo.5138072"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.5138071.svg" alt="DOI"></a>. Please also view the version specific DOIs on zenodo, if you aim to cite a specific version.
 
 Copyright (C) 2019-2021: Jan N. Hansen
 
