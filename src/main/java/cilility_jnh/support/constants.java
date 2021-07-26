@@ -4,24 +4,6 @@ import java.awt.Font;
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 
-/**
-These tools are free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation (http://www.gnu.org/licenses/gpl.txt )
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-See the GNU General Public License for more details.
-
-Copyright (C) 2016 Jan N Hansen 
-  
-For any questions please feel free to contact me (jan.hansen@caesar.de).
-
-**/
-
 public class constants {
 	//Axes
 	public final static double [] X_AXIS = {1.0,0.0,0.0};

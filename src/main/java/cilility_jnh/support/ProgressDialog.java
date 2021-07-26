@@ -1,29 +1,7 @@
-/***===============================================================================
- 
- ProgressDialog.java Version 20161129
-
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- as published by the Free Software Foundation (http://www.gnu.org/licenses/gpl.txt )
-
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
- 
- See the GNU General Public License for more details.
- 
- Copyright (C) 2016: Jan N Hansen 
-   
- For any questions please feel free to contact me (jan.hansen@caesar.de).
-
-==============================================================================**/
-
 package cilility_jnh.support;
 
 import java.awt.*;
 import java.awt.event.*;
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -41,7 +19,6 @@ import javax.swing.JScrollPane;
 import javax.swing.ListModel;
 import javax.swing.SwingConstants;
 
-import ij.IJ;
 
 
 public class ProgressDialog extends javax.swing.JFrame implements ActionListener{	

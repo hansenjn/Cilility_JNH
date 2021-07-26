@@ -1,6 +1,6 @@
 package cilility_jnh;
 /** ===============================================================================
-* Cilility_JNH.java Version 0.2.1
+* Cilility_JNH.java Version 0.2.2
 * 
 * This program is free software; you can redistribute it and/or
 * modify it under the terms of the GNU General Public License
@@ -14,7 +14,7 @@ package cilility_jnh;
 * See the GNU General Public License for more details.
 *  
 * Copyright (C) Jan Niklas Hansen
-* Date: June 13, 2019 (This Version: November 10, 2020)
+* Date: June 13, 2019 (This Version: July 26, 2021)
 *   
 * For any questions please feel free to contact me (jan.hansen@uni-bonn.de).
 * =============================================================================== */
@@ -35,12 +35,10 @@ import ij.plugin.*;
 import ij.process.ImageConverter;
 import ij.text.*;
 
-import org.apache.commons.math3.linear.*;
-
 public class CililityMain implements PlugIn, Measurements {
 	//Name variables
 	static final String PLUGINNAME = "Cilility_JNH";
-	static final String PLUGINVERSION = "0.2.1";
+	static final String PLUGINVERSION = "0.2.2";
 	
 	//Fix fonts
 	static final Font SuperHeadingFont = new Font("Sansserif", Font.BOLD, 16);
@@ -90,22 +88,24 @@ public void run(String arg) {
 	GenericDialog gd = new GenericDialog(PLUGINNAME + " - set parameters");	
 	//show Dialog-----------------------------------------------------------------
 	//.setInsets(top, left, bottom)
-	gd.setInsets(0,0,0);	gd.addMessage(PLUGINNAME + ", Version " + PLUGINVERSION + ", \u00a9 2019 JN Hansen", SuperHeadingFont);	
-	gd.setInsets(5,0,0);	gd.addChoice("process ", taskVariant, selectedTaskVariant);
+	gd.setInsets(0,0,0);		gd.addMessage(PLUGINNAME + ", Version " + PLUGINVERSION + ", \u00a9 2019 JN Hansen", SuperHeadingFont);	
+	gd.setInsets(5,0,0);		gd.addChoice("process ", taskVariant, selectedTaskVariant);
 	gd.setInsets(5, 0, 0);	gd.addNumericField("Recording frequency (Hz)", sampleRate, 2);
-	gd.setInsets(5, 0, 0);	gd.addNumericField("Sliding Window Size for smoothing power spectrum (Hz)", smoothFreq, 2);
-	gd.setInsets(-5,10,0);	gd.addMessage("(if set to 0.0: no smoothing is performed)", InstructionsFont);
-	gd.setInsets(5, 0, 0);	gd.addNumericField("Percent lowest power regions used for determining power threshold", percentLowest, 1);
-	gd.setInsets(5, 0, 0);	gd.addNumericField("Fold SD used for thresholding power spectrum", limitSD, 1);
-	gd.setInsets(0,0,0);	gd.addMessage("Example FDRs (False discovery rates) for fold SDs:", InstructionsFont);
-	gd.setInsets(-5,10,0);	gd.addMessage("1.5x SD -> FDR = 4.4 %", InstructionsFont);
-	gd.setInsets(-5,10,0);	gd.addMessage("2x SD -> FDR = 1.7 %", InstructionsFont);	
-	gd.setInsets(-5,10,0);	gd.addMessage("2.5x SD -> FDR = 0.5 %", InstructionsFont);	
-	gd.setInsets(-5,10,0);	gd.addMessage("3x SD -> FDR = 0.1 %", InstructionsFont);	
-	gd.setInsets(5, 0, 0);	gd.addNumericField("Max accepted frequency for filtering (Hz)", upperLimit, 2);
-	gd.setInsets(5, 0, 0);	gd.addNumericField("Min accepted frequency for filtering (Hz)", lowerLimit, 2);
-	
-	gd.setInsets(15,0,0);	gd.addChoice("Output image: ", outputVariant, selectedOutputVariant);
+	gd.setInsets(5, 0, 0);	gd.addNumericField("Sliding window size for smoothing power spectrum (Hz)", smoothFreq, 2);
+	gd.setInsets(0,30,0);	gd.addMessage("(if set to 0.0: no smoothing is performed)", InstructionsFont);
+
+	gd.setInsets(5,0,0);		gd.addMessage("Settings - signal regions", SubHeadingFont);
+	gd.setInsets(0, 0, 0);	gd.addNumericField("Percent lowest power regions used to determine power threshold", percentLowest, 1);
+	gd.setInsets(0, 0, 0);	gd.addNumericField("Fold SD used for thresholding power spectrum", limitSD, 1);
+	gd.setInsets(5,0,0);		gd.addMessage("Example FDRs (False discovery rates) for fold SDs:", InstructionsFont);
+	gd.setInsets(0,0,0);	gd.addMessage("1.5x SD -> FDR = 4.4 %, 2x SD -> FDR = 1.7 %, 2.5x SD -> FDR = 0.5 %, 3x SD -> FDR = 0.1 %", InstructionsFont);	
+
+	gd.setInsets(5,0,0);		gd.addMessage("Settings - restrict frequency range for quantifications and plots", SubHeadingFont);
+	gd.setInsets(0, 0, 0);	gd.addNumericField("Max accepted frequency (Hz)", upperLimit, 2);
+	gd.setInsets(0, 0, 0);	gd.addNumericField("Min accepted frequency (Hz)", lowerLimit, 2);
+
+	gd.setInsets(5,0,0);		gd.addMessage("Output settings", SubHeadingFont);
+	gd.setInsets(15,0,0);	gd.addChoice("Output file names ", outputVariant, selectedOutputVariant);
 	gd.showDialog();
 	//show Dialog-----------------------------------------------------------------
 
@@ -583,12 +583,6 @@ public void run(String arg) {
 				    	wholeImpCorrSharp [1] = 0.0;
 				    }		   	
 				}
-				
-				// GET EIGENVECTOR MAP
-	//			progress.updateBarText("get eigentvector map - raw frequency results...");
-	//			double [][] evMapRaw = getEigenVectorMap(rawFreqRes, 5, 0);
-	//			progress.updateBarText("get eigentvector map - corrected frequency results...");
-	//			double [][] evMapCorr = getEigenVectorMap(corrFreqRes, 5, 0);
 			   	
 				//GET Phases for specific frequency
 				phaseMapRoiFreqs = new double [imp.getWidth()][imp.getHeight()][2];
@@ -1022,14 +1016,6 @@ private void addFooter(TextPanel tp, Date currentDate){
 			+ " but WITHOUT ANY WARRANTY; without even the implied warranty of"
 			+ " MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.");
 	tp.append("Plug-in version:	V"+PLUGINVERSION);	
-}
-
-private String getOneRowFooter(Date currentDate){
-	return  "Datafile was generated on " + FullDateFormatter2.format(currentDate) + " by '"+PLUGINNAME+"', an ImageJ plug-in by Jan Niklas Hansen (jan.hansen@uni-bonn.de)."
-			+ "	The plug-in '"+PLUGINNAME+"' is distributed in the hope that it will be useful,"
-				+ " but WITHOUT ANY WARRANTY; without even the implied warranty of"
-				+ " MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
-			+"	Plug-in version:	V"+PLUGINVERSION;	
 }
 
 private static double [] getFrequenciesWithPower (double [] values, double sampleRate, boolean showPlot, boolean normalizePlusMinus, int smoothWindowSize, double lowerLimit, double upperLimit){
@@ -2110,28 +2096,8 @@ private static void convertToRGB(ImagePlus imp){
 		RGBStackConverter.convertToRGB(imp);
 		imp.setCalibration(cal);
 	}else{
-		//TODO changed 23.05.2019
 		ImageConverter iCv = new ImageConverter(imp);
 		iCv.convertToRGB();
-//		
-//		int nSlices = imp.getNSlices();
-//		int nFrames = imp.getNFrames();
-//		
-//		int nImages = imp.getStackSize();
-//		ImageStack stack1 = imp.getStack(),
-//				stack2 = new ImageStack(imp.getWidth(), imp.getHeight());
-//        String label;
-//        ImageProcessor ip1, ip2;
-//        Calibration cal = imp.getCalibration();
-//        for(int i = 1; i <= nImages; i++) {
-//            label = stack1.getSliceLabel(i);
-//            ip1 = stack1.getProcessor(i);
-//            ip2 = ip1.convertToRGB();
-//            stack2.addSlice(label, ip2);
-//        }
-//        imp.setStack(stack2);
-//        imp.setCalibration(cal);
-//        HyperStackConverter.toHyperStack(imp, 1, nSlices, nFrames);
 	}	        
 }
 
@@ -2174,48 +2140,4 @@ private static void plot2DArray(double xValues [], double [][] array, String lab
 	p.dispose();			
  	System.gc();
 }
-
-/**
- * @returns the first three Eigenvectors from a matrix
- * */
-static double [][] getEigenvectorsFromAMatrix (double inMatrix [][]) {
-	RealMatrix matrix = MatrixUtils.createRealMatrix(inMatrix.length,inMatrix[0].length);
-	for(int i = 0; i < inMatrix.length; i++) {
-		matrix.setColumn(i,inMatrix[i]);
-	}
-	final EigenDecomposition ed = new EigenDecomposition(matrix);
-	
-	double [][] vectors = new double [3][3];
-	vectors [0] = new double []{ed.getEigenvector(0).getEntry(0),ed.getEigenvector(0).getEntry(1),ed.getEigenvector(0).getEntry(2)};
-	vectors [1] = new double [] {ed.getEigenvector(1).getEntry(0),ed.getEigenvector(1).getEntry(1),ed.getEigenvector(1).getEntry(2)};
-	vectors [2] = new double [] {ed.getEigenvector(1).getEntry(0),ed.getEigenvector(1).getEntry(1),ed.getEigenvector(1).getEntry(2)};
-//	
-	return vectors;
-}
-
-static double [][] getEigenVectorMap(double [][][] data, int component, int nonZeroComponentForCheck){
-	double map [][] = new double [data.length][data[0].length];
-	double matrix [][] = new double [3][3];
-	double ev [][];
-	for(int x = 1; x < data.length-1; x++){
-   		doY: for(int y = 1; y < data[0].length-1; y++){
-
-   			for(int xi = x-1; xi < x+2; xi++) {
-   				for(int yi = y-1; yi < y+2; yi++) {
-   					if(data [xi][yi][nonZeroComponentForCheck]==0.0) {
-   						continue doY;
-   					}
-   	   				matrix [xi-(x-1)][yi-(y-1)] = data [xi][yi][component];
-   	   			}
-   			}
-   			
-   			ev = getEigenvectorsFromAMatrix(matrix);
-   			
-   			map [x][y] = tools.getAbsoluteAngle(new double [] {ev[0][0],ev[0][1]}, constants.X_AXIS);
-   		}
-	}
-	return map;
-}
-
-
 }//end main class
