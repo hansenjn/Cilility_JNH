@@ -1,6 +1,6 @@
 package cilility_jnh;
 /** ===============================================================================
-* Cilility_JNH.java Version 0.2.2
+* Cilility_JNH.java Version 0.2.3
 * 
 * This program is free software; you can redistribute it and/or
 * modify it under the terms of the GNU General Public License
@@ -14,7 +14,7 @@ package cilility_jnh;
 * See the GNU General Public License for more details.
 *  
 * Copyright (C) Jan Niklas Hansen
-* Date: June 13, 2019 (This Version: July 26, 2021)
+* Date: June 13, 2019 (This Version: November 09, 2021)
 *   
 * For any questions please feel free to contact me (jan.hansen@uni-bonn.de).
 * =============================================================================== */
@@ -38,7 +38,7 @@ import ij.text.*;
 public class CililityMain implements PlugIn, Measurements {
 	//Name variables
 	static final String PLUGINNAME = "Cilility_JNH";
-	static final String PLUGINVERSION = "0.2.2";
+	static final String PLUGINVERSION = "0.2.3";
 	
 	//Fix fonts
 	static final Font SuperHeadingFont = new Font("Sansserif", Font.BOLD, 16);
@@ -75,8 +75,8 @@ public class CililityMain implements PlugIn, Measurements {
 		
 	//-----------------define params for Dialog-----------------
 	
-	//Variables for processing of an individual task
-//		enum channelType {PLAQUE,CELL,NEURITE};
+	//Global variables for use
+	TextPanel OutputPanel;
 	
 public void run(String arg) {
 	df1US.setDecimalFormatSymbols(new DecimalFormatSymbols(Locale.US));;
@@ -800,13 +800,13 @@ public void run(String arg) {
 				
 				
 				tp1.append("");
-				tp1.append("Detailed results");
+				tp1.append("Detailed results");	//TODO remove
 				tp1.append("	Primary Frequency (in Hz, post filtering)");
 				for(int y = 0; y < imp.getHeight(); y++){
 					appText = "";
 					for(int x = 0; x < imp.getWidth(); x++){
 						appText += "	";
-						if(signalPostCorr [x][y] && corrFreqRes [x][y][0]!=0.0 && corrFreqRes [x][y][0] <= sampleRate / 4.0
+						if(signalPostCorr [x][y] && corrFreqRes [x][y][0]!=0.0
 								&& corrFreqRes [x][y][0] >= lowerLimit && corrFreqRes [x][y][0] <= upperLimit){
 							appText += constants.df6US.format(corrFreqRes [x][y][0]);
 						}
@@ -820,7 +820,7 @@ public void run(String arg) {
 					appText = "";
 					for(int x = 0; x < imp.getWidth(); x++){
 						appText += "	";
-						if(signalPostCorr [x][y] && corrFreqRes [x][y][0]!=0.0 && corrFreqRes [x][y][0] <= sampleRate / 4.0
+						if(signalPostCorr [x][y] && corrFreqRes [x][y][0]!=0.0
 								&& corrFreqRes [x][y][0] >= lowerLimit && corrFreqRes [x][y][0] <= upperLimit){
 							appText += constants.df6US.format(Math.log10(corrFreqRes [x][y][1])*10);
 						}
@@ -834,7 +834,7 @@ public void run(String arg) {
 					appText = "";
 					for(int x = 0; x < imp.getWidth(); x++){
 						appText += "	";
-						if(signalPostCorr [x][y] && corrFreqRes [x][y][0]!=0.0 && corrFreqRes [x][y][2] <= sampleRate / 4.0
+						if(signalPostCorr [x][y] && corrFreqRes [x][y][0]!=0.0
 								&& corrFreqRes [x][y][0] >= lowerLimit && corrFreqRes [x][y][0] <= upperLimit){
 							appText += constants.df6US.format(corrFreqRes [x][y][2]);
 						}
@@ -848,7 +848,7 @@ public void run(String arg) {
 					appText = "";
 					for(int x = 0; x < imp.getWidth(); x++){
 						appText += "	";
-						if(signalPostCorr [x][y] && corrFreqRes [x][y][0]!=0.0 && corrFreqRes [x][y][2] <= sampleRate / 4.0
+						if(signalPostCorr [x][y] && corrFreqRes [x][y][0]!=0.0
 								&& corrFreqRes [x][y][0] >= lowerLimit && corrFreqRes [x][y][0] <= upperLimit){
 							appText += constants.df6US.format(Math.log10(corrFreqRes [x][y][3])*10);
 						}
@@ -862,7 +862,7 @@ public void run(String arg) {
 					appText = "";
 					for(int x = 0; x < imp.getWidth(); x++){
 						appText += "	";
-						if(signalPostCorr [x][y] && corrFreqRes [x][y][0]!=0.0 && corrFreqRes [x][y][4] <= sampleRate / 4.0
+						if(signalPostCorr [x][y] && corrFreqRes [x][y][0]!=0.0
 								&& corrFreqRes [x][y][0] >= lowerLimit && corrFreqRes [x][y][0] <= upperLimit){
 							appText += constants.df6US.format(corrFreqRes [x][y][4]);
 						}
@@ -906,29 +906,51 @@ public void run(String arg) {
 				tp3.saveAs(filePrefix + "_1r.txt");
 	//			IJ.saveAsTiff(imp, filePrefix + ".tif");
 				
-				save2DPlot(rawFreqRes, 0, "1st freq (Hz)", filePrefix + "_f1.tif", true, 0.0, sampleRate / 2.0, "Ice");
-				save2DPlot(rawFreqRes, 2, "2nd freq (Hz)", filePrefix + "_f2.tif", true, 0.0, sampleRate / 2.0, "Ice");
-				save2DPlot(rawFreqRes, 1, "power 1", filePrefix + "_f1p.tif", true, 0.0, Double.POSITIVE_INFINITY, "Ice");
-				save2DPlot(rawFreqRes, 3, "power 2", filePrefix + "_f2p.tif", true, 0.0, Double.POSITIVE_INFINITY, "Ice");
-				save2DPlot(rawFreqRes, 4, "com freq (Hz)", filePrefix + "_com.tif", true, 0.0, sampleRate / 4.0, "Ice");
-				save2DPlot(rawFreqRes, 5, "phase of 1st freq (rad)", filePrefix + "_ph1.tif", true, -Math.PI, Math.PI, "Spectrum");
-				save2DPlot(rawFreqRes, 6, "phase of 2nd freq (rad)", filePrefix + "_ph2.tif", true, -Math.PI, Math.PI, "Spectrum");
-	//			save2DPlot(evMapRaw, "eigenvec ph1 (rad)", filePrefix + "_ev1.tif", true, -Math.PI, Math.PI, "Spectrum");
-				saveBooleanAsPlot(signal, "signal region", filePrefix + "_signal.tif");
-				save2DPlot(corrFreqRes, 0, "1st freq (Hz)", filePrefix + "_f1_c.tif", true, lowerLimit, upperLimit, "Ice");
-				save2DPlot(corrFreqRes, 2, "2nd freq (Hz)", filePrefix + "_f2_c.tif", true, lowerLimit, upperLimit, "Ice");
-				save2DPlot(corrFreqRes, 1, "power 1", filePrefix + "_f1p_c.tif", true, 0.0, Double.POSITIVE_INFINITY, "Ice");
-				save2DPlot(corrFreqRes, 3, "power 2", filePrefix + "_f2p_c.tif", true, 0.0, Double.POSITIVE_INFINITY, "Ice");
-				save2DPlot(corrFreqRes, 4, "com freq (Hz)", filePrefix + "_com_c.tif", true, lowerLimit, upperLimit, "Ice");
-				save2DPlot(corrFreqRes, 5, "phase of 1st freq (rad)", filePrefix + "_ph1_c.tif", true, -Math.PI, Math.PI, "Spectrum");
-				save2DPlot(corrFreqRes, 6, "phase of 2nd freq (rad)", filePrefix + "_ph2_c.tif", true, -Math.PI, Math.PI, "Spectrum");
-	//			save2DPlot(evMapCorr, "eigenvec ph1 (rad)", filePrefix + "_ev1_c.tif", true, -Math.PI, Math.PI, "Spectrum");
-				saveBooleanAsPlot(signalPostCorr, "signal region (corr)", filePrefix + "_signal_c.tif");
+				save2DPlot(rawFreqRes, 0,0, "1st freq (Hz)", filePrefix + "_f1", true, 0.0, sampleRate / 2.0, "Ice");
+				save2DPlot(rawFreqRes, 2,2, "2nd freq (Hz)", filePrefix + "_f2", true, 0.0, sampleRate / 2.0, "Ice");
+				save2DPlot(rawFreqRes, 1,1, "power 1", filePrefix + "_f1p", true, 0.0, Double.POSITIVE_INFINITY, "Ice");
+				save2DPlot(rawFreqRes, 3,3, "power 2", filePrefix + "_f2p", true, 0.0, Double.POSITIVE_INFINITY, "Ice");
+				save2DPlot(rawFreqRes, 4,4, "com freq (Hz)", filePrefix + "_com", true, 0.0, sampleRate / 4.0, "Ice");
+				save2DPlot(rawFreqRes, 5,0, "phase of 1st freq (rad)", filePrefix + "_ph1", true, -Math.PI, Math.PI, "Spectrum");
+				save2DPlot(rawFreqRes, 6,2, "phase of 2nd freq (rad)", filePrefix + "_ph2",true, -Math.PI, Math.PI, "Spectrum");
+	//			save2DPlot(evMapRaw, "eigenvec ph1 (rad)", filePrefix + "_ev1", true, -Math.PI, Math.PI, "Spectrum");
+				saveBooleanAsPlot(signal, "signal region", filePrefix + "_signal");
+				save2DPlot(corrFreqRes, 0,0, "1st freq (Hz)", filePrefix + "_f1_c", true, lowerLimit, upperLimit, "Ice");
+				save2DPlot(corrFreqRes, 2,2, "2nd freq (Hz)", filePrefix + "_f2_c", true, lowerLimit, upperLimit, "Ice");
+				save2DPlot(corrFreqRes, 1,1, "power 1", filePrefix + "_f1p_c", true, 0.0, Double.POSITIVE_INFINITY, "Ice");
+				save2DPlot(corrFreqRes, 3,3, "power 2", filePrefix + "_f2p_c", true, 0.0, Double.POSITIVE_INFINITY, "Ice");
+				save2DPlot(corrFreqRes, 4,4, "com freq (Hz)", filePrefix + "_com_c", true, lowerLimit, upperLimit, "Ice");
+				save2DPlot(corrFreqRes, 5,0, "phase of 1st freq (rad)", filePrefix + "_ph1_c", true, -Math.PI, Math.PI, "Spectrum");
+				save2DPlot(corrFreqRes, 6,2, "phase of 2nd freq (rad)", filePrefix + "_ph2_c",true, -Math.PI, Math.PI, "Spectrum");
+	//			save2DPlot(evMapCorr, "eigenvec ph1 (rad)", filePrefix + "_ev1_c", true, -Math.PI, Math.PI, "Spectrum");
+				saveBooleanAsPlot(signalPostCorr, "signal region (corr)", filePrefix + "_signal_c");
 				
-				save2DPlot(phaseMapRoiFreqs, 0, "phase at " + locFreqs [0] + " Hz (rad)", filePrefix + "_ph_freq1_r.tif", true, -Math.PI, Math.PI, "Spectrum");
-				save2DPlot(phaseMapRoiFreqs, 1, "phase at " + locFreqs [1] + " Hz (rad)", filePrefix + "_ph_freq2_r.tif", true, -Math.PI, Math.PI, "Spectrum");
-				save2DPlot(phaseMapWholeImpFreqs, 0, "phase at " + locFreqs [2] + " Hz (rad)", filePrefix + "_ph_freq1_w.tif", true, -Math.PI, Math.PI, "Spectrum");
-				save2DPlot(phaseMapWholeImpFreqs, 1, "phase at " + locFreqs [3] + " Hz (rad)", filePrefix + "_ph_freq2_w.tif", true, -Math.PI, Math.PI, "Spectrum");
+				save2DPlotMasked(phaseMapRoiFreqs,corrFreqRes, 0,0, "phase at " + locFreqs [0] + " Hz (rad)", filePrefix + "_ph_freq1_r", -Math.PI, Math.PI, "Spectrum");
+				save2DPlotMasked(phaseMapRoiFreqs,corrFreqRes, 1,2, "phase at " + locFreqs [1] + " Hz (rad)", filePrefix + "_ph_freq2_r", -Math.PI, Math.PI, "Spectrum");
+				save2DPlotMasked(phaseMapWholeImpFreqs,corrFreqRes, 0,0, "phase at " + locFreqs [2] + " Hz (rad)", filePrefix + "_ph_freq1_w", -Math.PI, Math.PI, "Spectrum");
+				save2DPlotMasked(phaseMapWholeImpFreqs,corrFreqRes, 1,2, "phase at " + locFreqs [3] + " Hz (rad)", filePrefix + "_ph_freq2_w", -Math.PI, Math.PI, "Spectrum");
+				
+				//save these plots also as text files
+				save2DPlotAsText(rawFreqRes, 0,0, "1st freq (Hz)", filePrefix + "_f1", true, 0.0, sampleRate / 2.0, currentDate);
+				save2DPlotAsText(rawFreqRes, 2,2, "2nd freq (Hz)", filePrefix + "_f2", true, 0.0, sampleRate / 2.0, currentDate);
+				save2DPlotAsText(rawFreqRes, 1,1, "power 1", filePrefix + "_f1p", true, 0.0, Double.POSITIVE_INFINITY, currentDate);
+				save2DPlotAsText(rawFreqRes, 3,3, "power 2", filePrefix + "_f2p", true, 0.0, Double.POSITIVE_INFINITY, currentDate);
+				save2DPlotAsText(rawFreqRes, 4,4, "com freq (Hz)", filePrefix + "_com", true, 0.0, sampleRate / 4.0, currentDate);
+				save2DPlotAsText(rawFreqRes, 5,5, "phase of 1st freq (rad)", filePrefix + "_ph1", true, -Math.PI, Math.PI, currentDate);
+				save2DPlotAsText(rawFreqRes, 6,6, "phase of 2nd freq (rad)", filePrefix + "_ph2", true, -Math.PI, Math.PI, currentDate);
+				
+				save2DPlotAsText(corrFreqRes, 0,0, "1st freq (Hz)", filePrefix + "_f1_c", true, lowerLimit, upperLimit, currentDate);
+				save2DPlotAsText(corrFreqRes, 2,2, "2nd freq (Hz)", filePrefix + "_f2_c", true, lowerLimit, upperLimit, currentDate);
+				save2DPlotAsText(corrFreqRes, 1,1, "power 1", filePrefix + "_f1p_c", true, 0.0, Double.POSITIVE_INFINITY, currentDate);
+				save2DPlotAsText(corrFreqRes, 3,3, "power 2", filePrefix + "_f2p_c", true, 0.0, Double.POSITIVE_INFINITY, currentDate);
+				save2DPlotAsText(corrFreqRes, 4,4, "com freq (Hz)", filePrefix + "_com_c", true, lowerLimit, upperLimit, currentDate);
+				save2DPlotAsText(corrFreqRes, 5,0, "phase of 1st freq (rad)", filePrefix + "_ph1_c", true, -Math.PI, Math.PI, currentDate);
+				save2DPlotAsText(corrFreqRes, 6,2, "phase of 2nd freq (rad)", filePrefix + "_ph2_c",true, -Math.PI, Math.PI, currentDate);
+				
+				save2DPlotAsTextMasked(phaseMapRoiFreqs,corrFreqRes, 0,0, "phase at " + locFreqs [0] + " Hz (rad)", filePrefix + "_ph_freq1_r", -Math.PI, Math.PI, currentDate);
+				save2DPlotAsTextMasked(phaseMapRoiFreqs,corrFreqRes, 1,2, "phase at " + locFreqs [1] + " Hz (rad)", filePrefix + "_ph_freq2_r", -Math.PI, Math.PI, currentDate);
+				save2DPlotAsTextMasked(phaseMapWholeImpFreqs,corrFreqRes, 0,0, "phase at " + locFreqs [2] + " Hz (rad)", filePrefix + "_ph_freq1_w", -Math.PI, Math.PI, currentDate);
+				save2DPlotAsTextMasked(phaseMapWholeImpFreqs,corrFreqRes, 1,2, "phase at " + locFreqs [3] + " Hz (rad)", filePrefix + "_ph_freq2_w", -Math.PI, Math.PI, currentDate);
 				
 				//plot power spectras
 				xValues = new double [(int)(sampleRate/2.0)];
@@ -1437,12 +1459,15 @@ public static double [] getAboveMinimumFrequenciesWithPowers (double [] values, 
     		freqs [1] * sampleRate / magnitude.length, ampl [1], com * sampleRate / magnitude.length};
 }
 
-public static void save2DPlot(double [][][] output, int index3rdDim, String unit, String savePath, boolean ignoreZero, double lowerLimit, double upperLimit, String usedLUT){
+/**
+ * Saves the matrix as a PNG file
+ * */
+public static void save2DPlot(double [][][] output, int index3rdDim, int indexDimensionForMasking, String unit, String savePath, boolean ignoreZero, double lowerLimit, double upperLimit, String usedLUT){
 	double max = Double.NEGATIVE_INFINITY;
 	double min = Double.POSITIVE_INFINITY;
 	for(int x = 0; x < output.length; x++){
 		for(int y = 0; y < output[x].length; y++){
-			if(ignoreZero && output[x][y][index3rdDim] == 0.0)	continue;
+			if(ignoreZero && output[x][y][indexDimensionForMasking] == 0.0)	continue;
 			if(output[x][y][index3rdDim] > upperLimit)	continue;
 			if(output[x][y][index3rdDim] < lowerLimit)	continue;
 	   		if(output[x][y][index3rdDim] > max){
@@ -1466,7 +1491,7 @@ public static void save2DPlot(double [][][] output, int index3rdDim, String unit
 	ImagePlus impOut = IJ.createImage("Output image", output.length, output[0].length + 20, 1, 8);
 	for(int x = 0; x < output.length; x++){
 		for(int y = 0; y < output[x].length; y++){
-			if(ignoreZero && output[x][y][index3rdDim] == 0.0)	continue;
+			if(ignoreZero && output[x][y][indexDimensionForMasking] == 0.0)	continue;
 			if(output[x][y][index3rdDim] > upperLimit)	continue;
 			if(output[x][y][index3rdDim] < lowerLimit)	continue;
 			
@@ -1500,7 +1525,7 @@ public static void save2DPlot(double [][][] output, int index3rdDim, String unit
 	
 	for(int x = 0; x < output.length; x++){
 		for(int y = 0; y < output[x].length; y++){
-			if(ignoreZero && output[x][y][index3rdDim] == 0.0){				
+			if(ignoreZero && output[x][y][indexDimensionForMasking] == 0.0){				
 			}else if(output[x][y][index3rdDim] > upperLimit){
 			}else if(output[x][y][index3rdDim] < lowerLimit){
 			}else{
@@ -1548,7 +1573,177 @@ public static void save2DPlot(double [][][] output, int index3rdDim, String unit
 		(int)Math.round((double)(output.length-txtID.getBounds().width)/2.0)-2, 
 		(int)Math.round(output[0].length + 18));
 		
-	IJ.saveAsTiff(impOut, savePath);
+//	IJ.saveAsTiff(impOut, savePath);
+	IJ.saveAs(impOut,"PNG",savePath + ".png");
+}
+
+public static void save2DPlotMasked(double [][][] output, double [][][] mask, int index3rdDim, int indexDimensionForMasking, String unit, String savePath, double lowerLimit, double upperLimit, String usedLUT){
+	double max = Double.NEGATIVE_INFINITY;
+	double min = Double.POSITIVE_INFINITY;
+	for(int x = 0; x < output.length; x++){
+		for(int y = 0; y < output[x].length; y++){
+			if(mask[x][y][indexDimensionForMasking] == 0.0)	continue;
+			if(output[x][y][index3rdDim] > upperLimit)	continue;
+			if(output[x][y][index3rdDim] < lowerLimit)	continue;
+	   		if(output[x][y][index3rdDim] > max){
+	   			max = output[x][y][index3rdDim]; 
+	   		}
+	   		if(output[x][y][index3rdDim] < min){
+	   			min = output[x][y][index3rdDim]; 
+	   		}
+		}
+	}
+	boolean ticks = false;
+	if(max-min>10){
+		max = 10.0*(double)((int)(max/10.0)+1);
+		min = 10.0*(double)((int)(min/10.0));
+		ticks = true;
+	}else{
+//		max = (double)((int)max+1);
+//		min = (double)((int)min);
+	}	
+	
+	ImagePlus impOut = IJ.createImage("Output image", output.length, output[0].length + 20, 1, 8);
+	for(int x = 0; x < output.length; x++){
+		for(int y = 0; y < output[x].length; y++){
+			if(mask[x][y][indexDimensionForMasking] == 0.0)	continue;
+			if(output[x][y][index3rdDim] > upperLimit)	continue;
+			if(output[x][y][index3rdDim] < lowerLimit)	continue;
+			
+			impOut.getStack().setVoxel(x, y, 0, (255.0*(output[x][y][index3rdDim]-min)/(max-min)));
+		}
+	}
+	
+	//write bar	
+	for(int x = 0; x < output.length; x++){
+		impOut.getStack().setVoxel(x, output[0].length + 2, 0, (255.0*(double)x/(double)output.length));
+		impOut.getStack().setVoxel(x, output[0].length + 3, 0, (255.0*(double)x/(double)output.length));
+		impOut.getStack().setVoxel(x, output[0].length + 4, 0, (255.0*(double)x/(double)output.length));
+	}	
+	IJ.run(impOut, usedLUT, "");
+	
+	convertToRGB(impOut);
+	
+	for(int x = 0; x < output.length; x++){
+		for(int y = output[0].length; y < output[0].length + 20; y++){
+			if(y == output[0].length + 2)	continue;
+			if(y == output[0].length + 3)	continue;
+			if(y == output[0].length + 4)	continue;
+			impOut.setC(0);
+			impOut.getStack().setVoxel(x, y, 0, 0.0);
+			impOut.setC(1);
+			impOut.getStack().setVoxel(x, y, 0, 0.0);
+			impOut.setC(2);
+			impOut.getStack().setVoxel(x, y, 0, 0.0);
+		}
+	}
+	
+	for(int x = 0; x < output.length; x++){
+		for(int y = 0; y < output[x].length; y++){
+			if(mask[x][y][indexDimensionForMasking] == 0.0){				
+			}else if(output[x][y][index3rdDim] > upperLimit){
+			}else if(output[x][y][index3rdDim] < lowerLimit){
+			}else{
+				continue;
+			}			
+			impOut.setC(0);
+			impOut.getStack().setVoxel(x, y, 0, 0.0);
+			impOut.setC(1);
+			impOut.getStack().setVoxel(x, y, 0, 0.0);
+			impOut.setC(2);
+			impOut.getStack().setVoxel(x, y, 0, 0.0);
+		}
+	}
+	
+
+	impOut.getImage().getGraphics().setColor(Color.WHITE);
+	if(ticks){
+		for(int i = (int)min; i <= (int)max; i++){
+			if(i%10==0){
+				impOut.getImage().getGraphics().drawLine((int)Math.round(output.length*(i-min)/(max-min)),
+						output[0].length + 4, (int)Math.round(output.length*(i-min)/(max-min)),
+						output[0].length + 5);				
+			}
+		}
+	}
+	
+	impOut.getImage().getGraphics().setFont(RoiFont);
+	impOut.getImage().getGraphics().drawString(df1US.format(min), 
+			(int)Math.round(2), 
+		(int)Math.round( output[0].length + 18));
+	
+	TextRoi txtID = new TextRoi((int)Math.round(output.length), 
+			(int)Math.round(output[0].length + 18),
+			df1US.format(max),
+			RoiFont);	
+	impOut.getImage().getGraphics().drawString(df1US.format(max), 
+			(int)Math.round(output.length)-txtID.getBounds().width-2, 
+			(int)Math.round(output[0].length + 18));
+				
+	txtID = new TextRoi((int)Math.round(output.length/2.0), 
+			(int)Math.round(output[0].length + 18),
+			unit,
+			RoiFont);
+	impOut.getImage().getGraphics().drawString(unit, 
+		(int)Math.round((double)(output.length-txtID.getBounds().width)/2.0)-2, 
+		(int)Math.round(output[0].length + 18));
+		
+//	IJ.saveAsTiff(impOut, savePath);
+	IJ.saveAs(impOut,"PNG",savePath + ".png");
+}
+
+public void save2DPlotAsText(double [][][] output, int index3rdDim, int refDimensionForMasking, String unit, String savePath, boolean ignoreZero, double lowerLimit, double upperLimit, Date currentDate){
+	OutputPanel = new TextPanel("Custom 2D Plot As Text");
+	String appText = "y (px) \u2193 | x (px) \u2192";
+	for(int x = 0; x < output.length; x++){
+		appText += "	" + x;
+	}
+	OutputPanel.append(appText);
+	
+	for(int y = 0; y < output[0].length; y++){
+		appText = y + "";
+		for(int x = 0; x < output.length; x++){
+			appText += "	";
+
+			if(ignoreZero && output[x][y][refDimensionForMasking] == 0.0)	continue;
+			if(output[x][y][index3rdDim] > upperLimit)	continue;
+			if(output[x][y][index3rdDim] < lowerLimit)	continue;
+			appText += constants.df6US.format(output [x][y][index3rdDim]);
+   		}
+		OutputPanel.append(appText);
+ 	}
+	
+	addFooter(OutputPanel, currentDate);				
+	OutputPanel.saveAs(savePath + ".txt");
+	
+	OutputPanel = null;
+}
+
+public void save2DPlotAsTextMasked(double [][][] output, double mask [][][], int index3rdDim, int refDimensionForMasking, String unit, String savePath, double lowerLimit, double upperLimit, Date currentDate){
+	OutputPanel = new TextPanel("Custom 2D Plot As Text");
+	String appText = "y (px) \u2193 | x (px) \u2192";
+	for(int x = 0; x < output.length; x++){
+		appText += "	" + x;
+	}
+	OutputPanel.append(appText);
+	
+	for(int y = 0; y < output[0].length; y++){
+		appText = y + "";
+		for(int x = 0; x < output.length; x++){
+			appText += "	";
+
+			if(mask[x][y][refDimensionForMasking] == 0.0)	continue;
+			if(output[x][y][index3rdDim] > upperLimit)	continue;
+			if(output[x][y][index3rdDim] < lowerLimit)	continue;
+			appText += constants.df6US.format(output [x][y][index3rdDim]);
+   		}
+		OutputPanel.append(appText);
+ 	}
+	
+	addFooter(OutputPanel, currentDate);				
+	OutputPanel.saveAs(savePath + ".txt");
+	
+	OutputPanel = null;
 }
 
 public static void save2DPlot(double [][] output, String unit, String savePath, boolean ignoreZero, double lowerLimit, double upperLimit, String usedLUT){
@@ -1662,7 +1857,8 @@ public static void save2DPlot(double [][] output, String unit, String savePath, 
 		(int)Math.round((double)(output.length-txtID.getBounds().width)/2.0)-2, 
 		(int)Math.round(output[0].length + 18));
 		
-	IJ.saveAsTiff(impOut, savePath);
+//	IJ.saveAsTiff(impOut, savePath);
+	IJ.saveAs(impOut,"PNG",savePath + ".png");
 }
 
 public static void save2DPlot(double [][] output, String unit, String savePath){
@@ -1751,7 +1947,8 @@ public static void save2DPlot(double [][] output, String unit, String savePath){
 		(int)Math.round((double)(output.length-txtID.getBounds().width)/2.0)-2, 
 		(int)Math.round(output[0].length + 18));
 		
-	IJ.saveAsTiff(impOut, savePath);
+//	IJ.saveAsTiff(impOut, savePath);
+	IJ.saveAs(impOut,"PNG",savePath + ".png");
 }
 
 public static void saveBooleanAsPlot(boolean [][] map, String title, String savePath){
