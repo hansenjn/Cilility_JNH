@@ -11,7 +11,7 @@
  
  	<artifactId>Cilility_JNH</artifactId>  
  	<groupId>JNH</groupId>
-    <version>0.2.3-SNAPSHOT</version>
+    <version>0.3.0-SNAPSHOT</version>
  
 <!-- Plugin Information -->
     <name>Cilility</name>

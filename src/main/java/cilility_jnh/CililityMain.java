@@ -1,6 +1,6 @@
 package cilility_jnh;
 /** ===============================================================================
-* Cilility_JNH.java Version 0.2.3
+* Cilility_JNH.java Version 0.3.0
 * 
 * This program is free software; you can redistribute it and/or
 * modify it under the terms of the GNU General Public License
@@ -14,7 +14,7 @@ package cilility_jnh;
 * See the GNU General Public License for more details.
 *  
 * Copyright (C) Jan Niklas Hansen
-* Date: June 13, 2019 (This Version: November 09, 2021)
+* Date: June 13, 2019 (This Version: January 17, 2022)
 *   
 * For any questions please feel free to contact me (jan.hansen@uni-bonn.de).
 * =============================================================================== */
@@ -33,12 +33,13 @@ import ij.io.*;
 import ij.measure.*;
 import ij.plugin.*;
 import ij.process.ImageConverter;
+import ij.process.LUT;
 import ij.text.*;
 
 public class CililityMain implements PlugIn, Measurements {
 	//Name variables
 	static final String PLUGINNAME = "Cilility_JNH";
-	static final String PLUGINVERSION = "0.2.3";
+	static final String PLUGINVERSION = "0.3.0";
 	
 	//Fix fonts
 	static final Font SuperHeadingFont = new Font("Sansserif", Font.BOLD, 16);
@@ -58,6 +59,31 @@ public class CililityMain implements PlugIn, Measurements {
 	ProgressDialog progress;	
 	boolean processingDone = false;	
 	boolean continueProcessing = true;
+	
+	static double jetLUTNumbers [][] = new double [][] {{0,0,0.562500000000000},{0,0,0.625000000000000},{0,0,0.687500000000000},
+		{0,0,0.750000000000000},{0,0,0.812500000000000},{0,0,0.875000000000000},
+		{0,0,0.937500000000000},{0,0,1},{0,0.0625000000000000,1},
+		{0,0.125000000000000,1},{0,0.187500000000000,1},{0,0.250000000000000,1},
+		{0,0.312500000000000,1},{0,0.375000000000000,1},{0,0.437500000000000,1},
+		{0,0.500000000000000,1},{0,0.562500000000000,1},{0,0.625000000000000,1},
+		{0,0.687500000000000,1},{0,0.750000000000000,1},{0,0.812500000000000,1},
+		{0,0.875000000000000,1},{0,0.937500000000000,1},{0,1,1},
+		{0.0625000000000000,1,0.937500000000000},{0.125000000000000,1,0.875000000000000},{0.187500000000000,1,0.812500000000000},
+		{0.250000000000000,1,0.750000000000000},{0.312500000000000,1,0.687500000000000},{0.375000000000000,1,0.625000000000000},
+		{0.437500000000000,1,0.562500000000000},{0.500000000000000,1,0.500000000000000},{0.562500000000000,1,0.437500000000000},
+		{0.625000000000000,1,0.375000000000000},{0.687500000000000,1,0.312500000000000},{0.750000000000000,1,0.250000000000000},
+		{0.812500000000000,1,0.187500000000000},{0.875000000000000,1,0.125000000000000},{0.937500000000000,1,0.0625000000000000},
+		{1,1,0},{1,0.937500000000000,0},{1,0.875000000000000,0},
+		{1,0.812500000000000,0},{1,0.750000000000000,0},{1,0.687500000000000,0},
+		{1,0.625000000000000,0},{1,0.562500000000000,0},{1,0.500000000000000,0},
+		{1,0.437500000000000,0},{1,0.375000000000000,0},{1,0.312500000000000,0},
+		{1,0.250000000000000,0},{1,0.187500000000000,0},{1,0.125000000000000,0},
+		{1,0.0625000000000000,0},{1,0,0},{0.937500000000000,0,0},
+		{0.875000000000000,0,0},{0.812500000000000,0,0},{0.750000000000000,0,0},
+		{0.687500000000000,0,0},{0.625000000000000,0,0},{0.562500000000000,0,0},
+		{0.500000000000000,0,0}};
+		
+	LUT jetLUT;
 	
 	//-----------------define params for Dialog-----------------
 	static final String[] taskVariant = {"active image in FIJI","multiple images (open multi-task manager)", "all images open in FIJI"};
@@ -126,7 +152,8 @@ public void run(String arg) {
 //---------------------end-GenericDialog-end----------------------------------
 //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 
-
+	jetLUT = this.getLUT(jetLUTNumbers, true);
+	
 	String name [] = {"",""};
 	String dir [] = {"",""};
 	ImagePlus allImps [] = new ImagePlus [2];
@@ -798,77 +825,10 @@ public void run(String arg) {
 					tp1.append("");
 				}
 				
-				
-				tp1.append("");
-				tp1.append("Detailed results");	//TODO remove
-				tp1.append("	Primary Frequency (in Hz, post filtering)");
-				for(int y = 0; y < imp.getHeight(); y++){
-					appText = "";
-					for(int x = 0; x < imp.getWidth(); x++){
-						appText += "	";
-						if(signalPostCorr [x][y] && corrFreqRes [x][y][0]!=0.0
-								&& corrFreqRes [x][y][0] >= lowerLimit && corrFreqRes [x][y][0] <= upperLimit){
-							appText += constants.df6US.format(corrFreqRes [x][y][0]);
-						}
-			   		}
-					tp1.append(appText);
-			 	}
-				
-				tp1.append("");
-				tp1.append("	Power of primary frequency post filtering (dB)");
-				for(int y = 0; y < imp.getHeight(); y++){
-					appText = "";
-					for(int x = 0; x < imp.getWidth(); x++){
-						appText += "	";
-						if(signalPostCorr [x][y] && corrFreqRes [x][y][0]!=0.0
-								&& corrFreqRes [x][y][0] >= lowerLimit && corrFreqRes [x][y][0] <= upperLimit){
-							appText += constants.df6US.format(Math.log10(corrFreqRes [x][y][1])*10);
-						}
-			   		}
-					tp1.append(appText);
-			 	}
-				
-				tp1.append("");
-				tp1.append("	Secondary Frequency (in Hz, post filtering)");
-				for(int y = 0; y < imp.getHeight(); y++){
-					appText = "";
-					for(int x = 0; x < imp.getWidth(); x++){
-						appText += "	";
-						if(signalPostCorr [x][y] && corrFreqRes [x][y][0]!=0.0
-								&& corrFreqRes [x][y][0] >= lowerLimit && corrFreqRes [x][y][0] <= upperLimit){
-							appText += constants.df6US.format(corrFreqRes [x][y][2]);
-						}
-			   		}
-					tp1.append(appText);
-			 	}
-				
-				tp1.append("");
-				tp1.append("	Power of secondary frequency post filtering (dB)");
-				for(int y = 0; y < imp.getHeight(); y++){
-					appText = "";
-					for(int x = 0; x < imp.getWidth(); x++){
-						appText += "	";
-						if(signalPostCorr [x][y] && corrFreqRes [x][y][0]!=0.0
-								&& corrFreqRes [x][y][0] >= lowerLimit && corrFreqRes [x][y][0] <= upperLimit){
-							appText += constants.df6US.format(Math.log10(corrFreqRes [x][y][3])*10);
-						}
-			   		}
-					tp1.append(appText);
-			 	}
-				
-				tp1.append("");			
-				tp1.append("	COM of frequencies (in Hz, post filtering)");
-				for(int y = 0; y < imp.getHeight(); y++){
-					appText = "";
-					for(int x = 0; x < imp.getWidth(); x++){
-						appText += "	";
-						if(signalPostCorr [x][y] && corrFreqRes [x][y][0]!=0.0
-								&& corrFreqRes [x][y][0] >= lowerLimit && corrFreqRes [x][y][0] <= upperLimit){
-							appText += constants.df6US.format(corrFreqRes [x][y][4]);
-						}
-			   		}
-					tp1.append(appText);
-			 	}
+				/**
+				 * No longer add detailed results to main file from v0.3.0
+				 * */
+//				addDetailedFrequencyMaps(tp1, imp, signalPostCorr, corrFreqRes);
 				
 				tp1.append("");
 				tp1.append("	Background Power Spectrum");
@@ -906,20 +866,20 @@ public void run(String arg) {
 				tp3.saveAs(filePrefix + "_1r.txt");
 	//			IJ.saveAsTiff(imp, filePrefix + ".tif");
 				
-				save2DPlot(rawFreqRes, 0,0, "1st freq (Hz)", filePrefix + "_f1", true, 0.0, sampleRate / 2.0, "Ice");
-				save2DPlot(rawFreqRes, 2,2, "2nd freq (Hz)", filePrefix + "_f2", true, 0.0, sampleRate / 2.0, "Ice");
-				save2DPlot(rawFreqRes, 1,1, "power 1", filePrefix + "_f1p", true, 0.0, Double.POSITIVE_INFINITY, "Ice");
-				save2DPlot(rawFreqRes, 3,3, "power 2", filePrefix + "_f2p", true, 0.0, Double.POSITIVE_INFINITY, "Ice");
-				save2DPlot(rawFreqRes, 4,4, "com freq (Hz)", filePrefix + "_com", true, 0.0, sampleRate / 4.0, "Ice");
+				save2DPlot(rawFreqRes, 0,0, "1st freq (Hz)", filePrefix + "_f1", true, 0.0, sampleRate / 2.0, "Jet");
+				save2DPlot(rawFreqRes, 2,2, "2nd freq (Hz)", filePrefix + "_f2", true, 0.0, sampleRate / 2.0, "Jet");
+				save2DPlot(rawFreqRes, 1,1, "power 1", filePrefix + "_f1p", true, 0.0, Double.POSITIVE_INFINITY, "Jet");
+				save2DPlot(rawFreqRes, 3,3, "power 2", filePrefix + "_f2p", true, 0.0, Double.POSITIVE_INFINITY, "Jet");
+				save2DPlot(rawFreqRes, 4,4, "com freq (Hz)", filePrefix + "_com", true, 0.0, sampleRate / 4.0, "Jet");
 				save2DPlot(rawFreqRes, 5,0, "phase of 1st freq (rad)", filePrefix + "_ph1", true, -Math.PI, Math.PI, "Spectrum");
 				save2DPlot(rawFreqRes, 6,2, "phase of 2nd freq (rad)", filePrefix + "_ph2",true, -Math.PI, Math.PI, "Spectrum");
 	//			save2DPlot(evMapRaw, "eigenvec ph1 (rad)", filePrefix + "_ev1", true, -Math.PI, Math.PI, "Spectrum");
 				saveBooleanAsPlot(signal, "signal region", filePrefix + "_signal");
-				save2DPlot(corrFreqRes, 0,0, "1st freq (Hz)", filePrefix + "_f1_c", true, lowerLimit, upperLimit, "Ice");
-				save2DPlot(corrFreqRes, 2,2, "2nd freq (Hz)", filePrefix + "_f2_c", true, lowerLimit, upperLimit, "Ice");
-				save2DPlot(corrFreqRes, 1,1, "power 1", filePrefix + "_f1p_c", true, 0.0, Double.POSITIVE_INFINITY, "Ice");
-				save2DPlot(corrFreqRes, 3,3, "power 2", filePrefix + "_f2p_c", true, 0.0, Double.POSITIVE_INFINITY, "Ice");
-				save2DPlot(corrFreqRes, 4,4, "com freq (Hz)", filePrefix + "_com_c", true, lowerLimit, upperLimit, "Ice");
+				save2DPlot(corrFreqRes, 0,0, "1st freq (Hz)", filePrefix + "_f1_c", true, lowerLimit, upperLimit, "Jet");
+				save2DPlot(corrFreqRes, 2,2, "2nd freq (Hz)", filePrefix + "_f2_c", true, lowerLimit, upperLimit, "Jet");
+				save2DPlot(corrFreqRes, 1,1, "power 1", filePrefix + "_f1p_c", true, 0.0, Double.POSITIVE_INFINITY, "Jet");
+				save2DPlot(corrFreqRes, 3,3, "power 2", filePrefix + "_f2p_c", true, 0.0, Double.POSITIVE_INFINITY, "Jet");
+				save2DPlot(corrFreqRes, 4,4, "com freq (Hz)", filePrefix + "_com_c", true, lowerLimit, upperLimit, "Jet");
 				save2DPlot(corrFreqRes, 5,0, "phase of 1st freq (rad)", filePrefix + "_ph1_c", true, -Math.PI, Math.PI, "Spectrum");
 				save2DPlot(corrFreqRes, 6,2, "phase of 2nd freq (rad)", filePrefix + "_ph2_c",true, -Math.PI, Math.PI, "Spectrum");
 	//			save2DPlot(evMapCorr, "eigenvec ph1 (rad)", filePrefix + "_ev1_c", true, -Math.PI, Math.PI, "Spectrum");
@@ -1030,6 +990,84 @@ public void run(String arg) {
 		progress.moveTask(task);
 		System.gc();
 	}
+}
+
+/**
+ * No longer needed to be added to output main text file from version v0.3.0 on.
+ * @deprecated
+ * */
+private void addDetailedFrequencyMaps(TextPanel tp1, ImagePlus imp, boolean signalPostCorr [][], double corrFreqRes [][][]) {
+	String appText;
+	tp1.append("Detailed results");	//TODO remove
+	tp1.append("	Primary Frequency (in Hz, post filtering)");
+	for(int y = 0; y < imp.getHeight(); y++){
+		appText = "";
+		for(int x = 0; x < imp.getWidth(); x++){
+			appText += "	";
+			if(signalPostCorr [x][y] && corrFreqRes [x][y][0]!=0.0
+					&& corrFreqRes [x][y][0] >= lowerLimit && corrFreqRes [x][y][0] <= upperLimit){
+				appText += constants.df6US.format(corrFreqRes [x][y][0]);
+			}
+   		}
+		tp1.append(appText);
+ 	}
+	
+	tp1.append("");
+	tp1.append("	Power of primary frequency post filtering (dB)");
+	for(int y = 0; y < imp.getHeight(); y++){
+		appText = "";
+		for(int x = 0; x < imp.getWidth(); x++){
+			appText += "	";
+			if(signalPostCorr [x][y] && corrFreqRes [x][y][0]!=0.0
+					&& corrFreqRes [x][y][0] >= lowerLimit && corrFreqRes [x][y][0] <= upperLimit){
+				appText += constants.df6US.format(Math.log10(corrFreqRes [x][y][1])*10);
+			}
+   		}
+		tp1.append(appText);
+ 	}
+	
+	tp1.append("");
+	tp1.append("	Secondary Frequency (in Hz, post filtering)");
+	for(int y = 0; y < imp.getHeight(); y++){
+		appText = "";
+		for(int x = 0; x < imp.getWidth(); x++){
+			appText += "	";
+			if(signalPostCorr [x][y] && corrFreqRes [x][y][0]!=0.0
+					&& corrFreqRes [x][y][0] >= lowerLimit && corrFreqRes [x][y][0] <= upperLimit){
+				appText += constants.df6US.format(corrFreqRes [x][y][2]);
+			}
+   		}
+		tp1.append(appText);
+ 	}
+	
+	tp1.append("");
+	tp1.append("	Power of secondary frequency post filtering (dB)");
+	for(int y = 0; y < imp.getHeight(); y++){
+		appText = "";
+		for(int x = 0; x < imp.getWidth(); x++){
+			appText += "	";
+			if(signalPostCorr [x][y] && corrFreqRes [x][y][0]!=0.0
+					&& corrFreqRes [x][y][0] >= lowerLimit && corrFreqRes [x][y][0] <= upperLimit){
+				appText += constants.df6US.format(Math.log10(corrFreqRes [x][y][3])*10);
+			}
+   		}
+		tp1.append(appText);
+ 	}
+	
+	tp1.append("");			
+	tp1.append("	COM of frequencies (in Hz, post filtering)");
+	for(int y = 0; y < imp.getHeight(); y++){
+		appText = "";
+		for(int x = 0; x < imp.getWidth(); x++){
+			appText += "	";
+			if(signalPostCorr [x][y] && corrFreqRes [x][y][0]!=0.0
+					&& corrFreqRes [x][y][0] >= lowerLimit && corrFreqRes [x][y][0] <= upperLimit){
+				appText += constants.df6US.format(corrFreqRes [x][y][4]);
+			}
+   		}
+		tp1.append(appText);
+ 	}
+	
 }
 private void addFooter(TextPanel tp, Date currentDate){
 	tp.append("");
@@ -1461,8 +1499,9 @@ public static double [] getAboveMinimumFrequenciesWithPowers (double [] values, 
 
 /**
  * Saves the matrix as a PNG file
+ * Write LUT Jet to use the Jet LUT.
  * */
-public static void save2DPlot(double [][][] output, int index3rdDim, int indexDimensionForMasking, String unit, String savePath, boolean ignoreZero, double lowerLimit, double upperLimit, String usedLUT){
+private void save2DPlot(double [][][] output, int index3rdDim, int indexDimensionForMasking, String unit, String savePath, boolean ignoreZero, double lowerLimit, double upperLimit, String usedLUT){
 	double max = Double.NEGATIVE_INFINITY;
 	double min = Double.POSITIVE_INFINITY;
 	for(int x = 0; x < output.length; x++){
@@ -1504,8 +1543,13 @@ public static void save2DPlot(double [][][] output, int index3rdDim, int indexDi
 		impOut.getStack().setVoxel(x, output[0].length + 2, 0, (255.0*(double)x/(double)output.length));
 		impOut.getStack().setVoxel(x, output[0].length + 3, 0, (255.0*(double)x/(double)output.length));
 		impOut.getStack().setVoxel(x, output[0].length + 4, 0, (255.0*(double)x/(double)output.length));
+	}
+	
+	if(usedLUT.equals("Jet") || usedLUT.equals("JET") || usedLUT.equals("jet")) {
+		impOut.setLut(jetLUT);
+	}else {
+		IJ.run(impOut,usedLUT, "");	
 	}	
-	IJ.run(impOut, usedLUT, "");
 	
 	convertToRGB(impOut);
 	
@@ -1577,7 +1621,7 @@ public static void save2DPlot(double [][][] output, int index3rdDim, int indexDi
 	IJ.saveAs(impOut,"PNG",savePath + ".png");
 }
 
-public static void save2DPlotMasked(double [][][] output, double [][][] mask, int index3rdDim, int indexDimensionForMasking, String unit, String savePath, double lowerLimit, double upperLimit, String usedLUT){
+private void save2DPlotMasked(double [][][] output, double [][][] mask, int index3rdDim, int indexDimensionForMasking, String unit, String savePath, double lowerLimit, double upperLimit, String usedLUT){
 	double max = Double.NEGATIVE_INFINITY;
 	double min = Double.POSITIVE_INFINITY;
 	for(int x = 0; x < output.length; x++){
@@ -1619,8 +1663,13 @@ public static void save2DPlotMasked(double [][][] output, double [][][] mask, in
 		impOut.getStack().setVoxel(x, output[0].length + 2, 0, (255.0*(double)x/(double)output.length));
 		impOut.getStack().setVoxel(x, output[0].length + 3, 0, (255.0*(double)x/(double)output.length));
 		impOut.getStack().setVoxel(x, output[0].length + 4, 0, (255.0*(double)x/(double)output.length));
-	}	
-	IJ.run(impOut, usedLUT, "");
+	}
+
+	if(usedLUT.equals("Jet") || usedLUT.equals("JET") || usedLUT.equals("jet")) {
+		impOut.setLut(jetLUT);
+	}else {
+		IJ.run(impOut,usedLUT, "");	
+	}
 	
 	convertToRGB(impOut);
 	
@@ -1861,7 +1910,7 @@ public static void save2DPlot(double [][] output, String unit, String savePath, 
 	IJ.saveAs(impOut,"PNG",savePath + ".png");
 }
 
-public static void save2DPlot(double [][] output, String unit, String savePath){
+public static void save2DPlot(double [][] output, String unit, String savePath, LUT customLUT){
 	double max = Double.NEGATIVE_INFINITY;
 	double min = Double.POSITIVE_INFINITY;
 	for(int x = 0; x < output.length; x++){
@@ -1897,7 +1946,12 @@ public static void save2DPlot(double [][] output, String unit, String savePath){
 		impOut.getStack().setVoxel(x, output[0].length + 3, 0, (255.0*(double)x/(double)output.length));
 		impOut.getStack().setVoxel(x, output[0].length + 4, 0, (255.0*(double)x/(double)output.length));
 	}	
-	IJ.run(impOut, "Ice", "");
+
+	if(customLUT.equals(null)) {
+		IJ.run(impOut, "Ice", "");
+	}else {
+		impOut.setLut(customLUT);		
+	}	
 	
 	convertToRGB(impOut);
 	
@@ -2336,5 +2390,39 @@ private static void plot2DArray(double xValues [], double [][] array, String lab
 	pImp.close();
 	p.dispose();			
  	System.gc();
+}
+
+private static LUT getLUT(double [][] array, boolean multiplyWith255) {
+	byte [] red = new byte [array.length];
+	byte [] green = new byte [array.length];
+	byte [] blue = new byte [array.length];
+	for(int i = 0; i < red.length; i++) {		
+		if(multiplyWith255) {
+			red [i] = (byte) (array [i][0] * 255.0);
+			green [i] = (byte) (array [i][1] * 255.0);
+			blue [i] = (byte) (array [i][2] * 255.0);
+		}else {
+			red [i] = (byte) (array [i][0]);
+			green [i] = (byte) (array [i][1]);
+			blue [i] = (byte) (array [i][2]);
+		}
+	}
+	
+	if(red.length < 256) {
+		//Interpolate
+		byte [] newRed = new byte [256];
+		byte [] newGreen = new byte [256];
+		byte [] newBlue = new byte [256];
+		int oldPos;
+		for (int i = 0; i < newRed.length; i++) {
+			oldPos = (int)((double) i * (double) red.length / 256.0);
+			newRed [i] = red [oldPos];
+			newGreen [i] = green [oldPos];
+			newBlue [i] = blue [oldPos];
+		}
+		return new LUT (8,newRed.length,newRed,newGreen,newBlue);
+	}else {
+		return new LUT (8,red.length,red,green,blue);
+	}	
 }
 }//end main class
