@@ -46,7 +46,8 @@ public class CililityMain implements PlugIn, Measurements {
 	static final Font HeadingFont = new Font("Sansserif", Font.BOLD, 14);
 	static final Font SubHeadingFont = new Font("Sansserif", Font.BOLD, 12);
 	static final Font TextFont = new Font("Sansserif", Font.PLAIN, 12);
-	static final Font InstructionsFont = new Font("Sansserif", 2, 12);
+	static final Font InstructionsFont = new Font("Sansserif", 2, 9);
+	static final Color INSTRCOLOR = new java.awt.Color(0,0,200);
 	static final Font RoiFont = new Font("Sansserif", Font.PLAIN, 12);
 	
 	static SimpleDateFormat NameDateFormatter = new SimpleDateFormat("yyMMdd_HHmmss");
@@ -90,9 +91,22 @@ public class CililityMain implements PlugIn, Measurements {
 	String selectedTaskVariant = taskVariant[1];
 	int tasks = 1;
 	double sampleRate = 2000.0;
-	double limitSD = 1.5;
+	
+	boolean extractSignalsUsingSD = true;
+	boolean removeBackgroundInSpectra = true;
+	
+	double SDlimitForSpectrumBG = 1.5;	
 	double percentLowest = 20;
-	double upperLimit = 90, lowerLimit = 5;
+	
+	int kernelWidth = 3;
+	double kernelSDThreshold = 3.0;
+	boolean extendRange = true;
+	
+	double upperLimit = 90.0, lowerLimit = 5.0;
+	double histogramBins = 5.0;
+	
+	boolean manualROI = false;
+	
 	double smoothFreq = 5.0;
 	int smoothWindowSize = 5;
 	
@@ -114,24 +128,48 @@ public void run(String arg) {
 	GenericDialog gd = new GenericDialog(PLUGINNAME + " - set parameters");	
 	//show Dialog-----------------------------------------------------------------
 	//.setInsets(top, left, bottom)
-	gd.setInsets(0,0,0);		gd.addMessage(PLUGINNAME + ", Version " + PLUGINVERSION + ", \u00a9 2019 JN Hansen", SuperHeadingFont);	
-	gd.setInsets(5,0,0);		gd.addChoice("process ", taskVariant, selectedTaskVariant);
-	gd.setInsets(5, 0, 0);	gd.addNumericField("Recording frequency (Hz)", sampleRate, 2);
-	gd.setInsets(5, 0, 0);	gd.addNumericField("Sliding window size for smoothing power spectrum (Hz)", smoothFreq, 2);
-	gd.setInsets(0,30,0);	gd.addMessage("(if set to 0.0: no smoothing is performed)", InstructionsFont);
+	gd.setInsets(0,0,0);		gd.addMessage(PLUGINNAME + ", Version " + PLUGINVERSION + ", \u00a9 2019-2022 JN Hansen", SuperHeadingFont);	
+	gd.setInsets(5,0,0);		gd.addChoice("Process ", taskVariant, selectedTaskVariant);
+	gd.setInsets(0, 0, 0);	gd.addNumericField("Recording frequency (Hz)", sampleRate, 2);
+	gd.setInsets(0, 0, 0);	gd.addNumericField("Sliding window to smooth power spectrum (Hz)", smoothFreq, 2);
+	gd.setInsets(0,30,0);		gd.addMessage("(Set sliding window to 0.0 to disable smoothing)", InstructionsFont, INSTRCOLOR);
 
-	gd.setInsets(5,0,0);		gd.addMessage("Settings - signal regions", SubHeadingFont);
-	gd.setInsets(0, 0, 0);	gd.addNumericField("Percent lowest power regions used to determine power threshold", percentLowest, 1);
-	gd.setInsets(0, 0, 0);	gd.addNumericField("Fold SD used for thresholding power spectrum", limitSD, 1);
-	gd.setInsets(5,0,0);		gd.addMessage("Example FDRs (False discovery rates) for fold SDs:", InstructionsFont);
-	gd.setInsets(0,0,0);	gd.addMessage("1.5x SD -> FDR = 4.4 %, 2x SD -> FDR = 1.7 %, 2.5x SD -> FDR = 0.5 %, 3x SD -> FDR = 0.1 %", InstructionsFont);	
-
-	gd.setInsets(5,0,0);		gd.addMessage("Settings - restrict frequency range for quantifications and plots", SubHeadingFont);
-	gd.setInsets(0, 0, 0);	gd.addNumericField("Max accepted frequency (Hz)", upperLimit, 2);
-	gd.setInsets(0, 0, 0);	gd.addNumericField("Min accepted frequency (Hz)", lowerLimit, 2);
-
-	gd.setInsets(5,0,0);		gd.addMessage("Output settings", SubHeadingFont);
-	gd.setInsets(15,0,0);	gd.addChoice("Output file names ", outputVariant, selectedOutputVariant);
+	gd.setInsets(10,0,0);		gd.addMessage("Enhance peak detection", SubHeadingFont);
+	gd.setInsets(0,5,0);		gd.addCheckbox("Remove background from power spectra (determined in spectra with low overall power)", removeBackgroundInSpectra);
+	gd.setInsets(0,5,0);		gd.addMessage("INFO: The next two parameters below are only relevant if you select to auto-remove the background. If option is activated,",
+			InstructionsFont, INSTRCOLOR);
+	gd.setInsets(0,5,0);		gd.addMessage("the percentage (parameter defined below) of pixels yielding the power spectra with the lowest overall power are extracted. Next the ",
+			InstructionsFont, INSTRCOLOR);
+	gd.setInsets(0,5,0);		gd.addMessage("mean and SD of the spectra from those pixels is determined to calculate a background spectrum as mean + (fold parameter below) * SD.",
+			InstructionsFont, INSTRCOLOR);
+	gd.setInsets(0, 5, 0);	gd.addNumericField("Percent of lowest-power pixels", percentLowest, 1);
+	gd.setInsets(0, 5, 0);	gd.addNumericField("Fold SD used to calculate power threshold", SDlimitForSpectrumBG, 1);
+	gd.setInsets(0,30,0);		gd.addMessage("(Example False Discovery Rates (FDRs) for set SDs: 1.5 -> FDR=4.4%, 2 -> FDR=1.7%, 2.5 -> FDR=0.5%, 3 -> FDR=0.1%)", 
+			InstructionsFont, INSTRCOLOR);
+	
+	gd.setInsets(10,0,0);		gd.addMessage("Extract signal regions", SubHeadingFont);
+	gd.setInsets(0,5,0);		gd.addCheckbox("Extract signal regions using local SD filter", extractSignalsUsingSD);
+	gd.setInsets(5,5,0);		gd.addMessage("INFO: The next two parameters below are only relevant if you select local SD filtering. The SD threshold defines the maximum allowed SD",
+			InstructionsFont, INSTRCOLOR);
+	gd.setInsets(0,5,0);		gd.addMessage("of a 3x3 pixel region to consider all pixels in that region as signal. If you activate the increase range function, not only pixels",
+			InstructionsFont, INSTRCOLOR);
+	gd.setInsets(0,5,0);		gd.addMessage("in the 3x3 region are considered for SD calculation but also the central four pixels above, below, left, and right of the 3x3 region.",
+			InstructionsFont, INSTRCOLOR);
+	gd.setInsets(5,5,0);		gd.addNumericField("Local SD filter - SD threshold: ", kernelSDThreshold, 2);
+	gd.setInsets(0,5,0);		gd.addCheckbox("Local SD filter - Increase range:", extendRange);
+		
+	gd.setInsets(10,0,0);		gd.addMessage("Limit frequency range for quantifications and plots", SubHeadingFont);
+	gd.setInsets(0, 5, 0);	gd.addNumericField("Min accepted frequency (Hz)", lowerLimit, 2);
+	gd.setInsets(0, 5, 0);	gd.addNumericField("Max accepted frequency (Hz)", upperLimit, 2);
+	
+	gd.setInsets(10,0,0);		gd.addMessage("Report a specific region of interest (ROI)?", SubHeadingFont);
+	gd.setInsets(0, 0, 0);	gd.addCheckbox("Report results for ROI set by user", manualROI);
+	gd.setInsets(0,30,0);		gd.addMessage("(If activated, the user is requested to draw a ROI for each image after launching the analysis)",
+			InstructionsFont, INSTRCOLOR);
+	
+	gd.setInsets(10,0,0);		gd.addMessage("Output settings", SubHeadingFont);
+	gd.setInsets(0, 5, 0);	gd.addNumericField("Bin size in histograms (Hz)", histogramBins, 2);
+	gd.setInsets(0,0,0);	gd.addChoice("Output file names ", outputVariant, selectedOutputVariant);
 	gd.showDialog();
 	//show Dialog-----------------------------------------------------------------
 
@@ -139,14 +177,31 @@ public void run(String arg) {
 	selectedTaskVariant = gd.getNextChoice();
 	sampleRate = gd.getNextNumber();
 	smoothFreq = gd.getNextNumber();
+
+	removeBackgroundInSpectra = gd.getNextBoolean();
 	percentLowest = gd.getNextNumber();
-	limitSD = gd.getNextNumber();
-	upperLimit = gd.getNextNumber();
+	SDlimitForSpectrumBG = gd.getNextNumber();
+	
+	extractSignalsUsingSD = gd.getNextBoolean();
+	kernelSDThreshold = gd.getNextNumber();
+	extendRange = gd.getNextBoolean();
+	
 	lowerLimit = gd.getNextNumber();
+	upperLimit = gd.getNextNumber();
+	
+	manualROI = gd.getNextBoolean();
+
+	histogramBins = gd.getNextNumber();
 	selectedOutputVariant = gd.getNextChoice();	
 	
 	//read and process variables--------------------------------------------------
 	if (gd.wasCanceled()) return;
+	
+	//Verify
+	if(lowerLimit < 0.0) {
+		lowerLimit = 0.0;
+		new WaitForUserDialog("<Min accepted frequency> must be >= 0.0. The setting <Min accepted frequency> was automatically corrected to 0.0!").show();
+	}
 	
 //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 //---------------------end-GenericDialog-end----------------------------------
@@ -240,7 +295,7 @@ public void run(String arg) {
 	//Request ROIs
 	Roi [] selections = new Roi [tasks];
    	ImagePlus imp; 	  	
-   	{
+   	if(manualROI){	//TODO implement when no ROI selected!!!
 		IJ.setTool("polygon");
 		{
 			for(int task = 0; task < tasks; task++){
@@ -277,6 +332,8 @@ public void run(String arg) {
 		}
 		System.gc();
 	}
+   	
+   	//TODO implement that selection files are only processed when selection exists!
 	
 	
    	//Initialize
@@ -353,7 +410,7 @@ public void run(String arg) {
 			/******************************************************************
 			*** 						Processing							***	
 			*******************************************************************/
-			   	//initialize
+			   	//Initialize Sliding Window
 			   	if(smoothFreq != 0.0){
 			   		smoothWindowSize = (int)(smoothFreq / (sampleRate/(double)imp.getStackSize()));
 				   	if(smoothWindowSize%2==0)	smoothWindowSize++;
@@ -361,10 +418,10 @@ public void run(String arg) {
 			   	}else{
 			   		smoothWindowSize = 0;
 			   	}
-			   
+			   		
+			   	//Obtain Raw Frequency Results
 			   	
-			   	
-			   	rawFreqRes = new double [imp.getWidth()][imp.getHeight()][5]; 
+			   	rawFreqRes = new double [imp.getWidth()][imp.getHeight()][7]; 
 			   	valueColumn = new double [imp.getStackSize()];
 			   	for(int x = 0; x < imp.getWidth(); x++){
 			   		progress.addToBar(0.3/(double)imp.getWidth());
@@ -376,67 +433,109 @@ public void run(String arg) {
 				   	}	
 			   	}
 			   	
-	//		   	boolean signal [][] = getSignalRegionsBySD(output, 3.0);
-			   	lowerPowerAvgSD = getAvgSDOfLowerPowers(rawFreqRes, percentLowest);
-			   	signal = getSignalRegionsByPowerThreshold(rawFreqRes, lowerPowerAvgSD[0] + limitSD * lowerPowerAvgSD[1]);
-			   	
-			   	powerSpectrumBackground = getPowerSpectraBackground(imp, signal, smoothWindowSize);
-	//		   	double [] powerSpectrumMinimum = getPowerSpectraMinima(imp, smoothWindowSize);
-			   			   			   	
-				corrFreqRes = new double [imp.getWidth()][imp.getHeight()][5]; 
-			   	for(int x = 0; x < imp.getWidth(); x++){
-			   		progress.addToBar(0.3/(double)imp.getWidth());
-			   		for(int y = 0; y < imp.getHeight(); y++){
-			   			for(int i = 0; i < imp.getStackSize(); i++){
-			   				valueColumn [i] = imp.getStack().getVoxel(x, y, i);
-			   			}
-			   			corrFreqRes[x][y] = getSignificantFrequenciesWithPowersAndPhases(valueColumn, sampleRate, false, true, powerSpectrumBackground, limitSD, lowerLimit, upperLimit, smoothWindowSize);
-	//		   			outputCorr[x][y] = getAboveMinimumFrequenciesWithPowers(valueColumn, sampleRate, false, true, powerSpectrumMinimum, lowerLimit, upperLimit);
-				   	}	
+			  //Determine Background
+			   	if(removeBackgroundInSpectra) {
+//				   	boolean signal [][] = getSignalRegionsBySD(output, 3.0);
+				   	lowerPowerAvgSD = getAvgSDOfLowerPowers(rawFreqRes, percentLowest);
+				   	signal = getSignalRegionsByPowerThreshold(rawFreqRes, lowerPowerAvgSD[0] + SDlimitForSpectrumBG * lowerPowerAvgSD[1]);
+				   	
+				   	powerSpectrumBackground = getPowerSpectraBackground(imp, signal, smoothWindowSize);
+		//		   	double [] powerSpectrumMinimum = getPowerSpectraMinima(imp, smoothWindowSize);
+				   
+				   	//get corrected Frequencies
+					corrFreqRes = new double [imp.getWidth()][imp.getHeight()][7]; 
+				   	for(int x = 0; x < imp.getWidth(); x++){
+				   		progress.addToBar(0.3/(double)imp.getWidth());
+				   		for(int y = 0; y < imp.getHeight(); y++){
+				   			for(int i = 0; i < imp.getStackSize(); i++){
+				   				valueColumn [i] = imp.getStack().getVoxel(x, y, i);
+				   			}
+				   			corrFreqRes[x][y] = getSignificantFrequenciesWithPowersAndPhases(valueColumn, sampleRate, false, true, powerSpectrumBackground, SDlimitForSpectrumBG, lowerLimit, upperLimit, smoothWindowSize);
+		//		   			outputCorr[x][y] = getAboveMinimumFrequenciesWithPowers(valueColumn, sampleRate, false, true, powerSpectrumMinimum, lowerLimit, upperLimit);
+					   	}	
+				   	}
+			   	}else {
+			   		lowerPowerAvgSD = null;
+			   		signal = null;
+			   		powerSpectrumBackground = null;
+			   		
+			   		corrFreqRes = new double [imp.getWidth()][imp.getHeight()][7]; 
+			   		for(int x = 0; x < imp.getWidth(); x++){
+				   		for(int y = 0; y < imp.getHeight(); y++){
+					   		for(int z = 0; z < rawFreqRes[x][y].length; z++){
+					   			corrFreqRes[x][y][z] = rawFreqRes[x][y][z];
+					   		}
+				   		}
+			   		}
+			   		
+			   		
+			   	}
+	
+			   	if(extractSignalsUsingSD) {
+			   		signalPostCorr = getSignalRegionsBySD(corrFreqRes, kernelSDThreshold, extendRange);
+			   		
+			   		//REMOVE non-signal pixels from corrected maps
+			   		for(int x = 0; x < imp.getWidth(); x++){
+				   		progress.addToBar(0.01/(double)imp.getWidth());
+				   		for(int y = 0; y < imp.getHeight(); y++){
+				   			if(!signalPostCorr[x][y]){
+				   				for(int i = 0; i < corrFreqRes[x][y].length; i++){
+				   					corrFreqRes[x][y][i] = 0.0;
+				   				}		   				
+				   			}
+					   	}	
+				   	}
+			   	}else {
+			   		signalPostCorr = new boolean [corrFreqRes.length][corrFreqRes[0].length];
+			   		for(int x = 0; x < imp.getWidth(); x++){
+				   		progress.addToBar(0.01/(double)imp.getWidth());
+				   		for(int y = 0; y < imp.getHeight(); y++){
+				   			signalPostCorr [x][y] = true;
+				   		}
+			   		}
 			   	}
 			   	
-			   	signalPostCorr = getSignalRegionsBySD(corrFreqRes, 3.0);
+			   	//GET NUMBER OF SIGNAL PIXELS IN ROI
 	//		   	boolean signalPostCorr [][] = signal;
 			   	int signalPixels = 0;
 			   	for(int x = 0; x < imp.getWidth(); x++){
-			   		progress.addToBar(0.05/(double)imp.getWidth());
+			   		progress.addToBar(0.04/(double)imp.getWidth());
 			   		for(int y = 0; y < imp.getHeight(); y++){
-			   			if(!signalPostCorr[x][y]){
-			   				for(int i = 0; i < corrFreqRes[x][y].length; i++){
-			   					corrFreqRes[x][y][i] = 0.0;
-			   				}		   				
-			   			}else if(selections[task].contains(x, y)){
+			   			if(selections[task].contains(x, y) && signalPostCorr [x][y]){
 			   				if(corrFreqRes[x][y][0]>=lowerLimit && corrFreqRes[x][y][0]<=upperLimit){
 			   					signalPixels++;
 			   				}		   				
-			   			}		   			
+			   			}
 				   	}	
 			   	}
 			   	
 			   	//DETERMINE PARAMETERS FOR SELECTION
-			   	double roiMin = Double.POSITIVE_INFINITY, roiMax = Double.NEGATIVE_INFINITY, roiAverage, roiSD;
+			   	double roiMin = Double.POSITIVE_INFINITY, roiMax = Double.NEGATIVE_INFINITY, roiAverage, roiMedian, roiSD;
 			   	valueColumn = new double [signalPixels];
 			   	signalPixels = 0;
 			   	int valueCounter = 0;
 			   	for(int x = 0; x < imp.getWidth(); x++){
 			   		progress.addToBar(0.05/(double)imp.getWidth());
 			   		for(int y = 0; y < imp.getHeight(); y++){
-			   			if(signalPostCorr[x][y] && selections[task].contains(x, y)){
-			   				if(roiMin > corrFreqRes[x][y][0] && corrFreqRes[x][y][0] != -1){
-			   					roiMin = corrFreqRes[x][y][0];
-			   				}
-			   				if(roiMax < corrFreqRes[x][y][0]){
-			   					roiMax = corrFreqRes[x][y][0];
-			   				}
-			   				if(corrFreqRes[x][y][0]>=lowerLimit && corrFreqRes[x][y][0]<=upperLimit){
-			   					valueColumn [valueCounter] = corrFreqRes[x][y][0];
-				   				valueCounter++;
-				   				signalPixels++;
-			   				}		   				
-			   			}else if(signalPostCorr[x][y]){
-			   				if(corrFreqRes[x][y][0]>=lowerLimit && corrFreqRes[x][y][0]<=upperLimit){
-			   					signalPixels++;
-			   				}
+			   			if(signalPostCorr[x][y]){
+			   				if(selections[task].contains(x, y)){
+				   				if(corrFreqRes[x][y][0]>=lowerLimit && corrFreqRes[x][y][0]<=upperLimit){
+				   					if(roiMin > corrFreqRes[x][y][0] && corrFreqRes[x][y][0] != -1){
+					   					roiMin = corrFreqRes[x][y][0];
+					   				}
+					   				if(roiMax < corrFreqRes[x][y][0]){
+					   					roiMax = corrFreqRes[x][y][0];
+					   				}
+				   					
+				   					valueColumn [valueCounter] = corrFreqRes[x][y][0];
+					   				valueCounter++;
+					   				signalPixels++;
+				   				}		   				
+				   			}else{
+				   				if(corrFreqRes[x][y][0]>=lowerLimit && corrFreqRes[x][y][0]<=upperLimit){
+				   					signalPixels++;
+				   				}
+				   			}
 			   			}
 				   	}	
 			   	}		   	
@@ -444,24 +543,26 @@ public void run(String arg) {
 			   		IJ.log("ERROR IN CODE!!!");
 			   	}
 			   	roiAverage = tools.getAverage(valueColumn);
+			   	roiMedian = tools.getMedian(valueColumn);
 			   	roiSD = tools.getSD(valueColumn);
+			   	//TODO HISTOGRAM histogramBins
 			   	
 			  //DETERMINE PARAMETERS FOR ENTIRE IMAGE
-			   	double wholeImpMin = Double.POSITIVE_INFINITY, wholeImpMax = Double.NEGATIVE_INFINITY, wholeImpAverage, wholeImpSD;
+			   	double wholeImpMin = Double.POSITIVE_INFINITY, wholeImpMax = Double.NEGATIVE_INFINITY, wholeImpAverage, wholeImpMedian, wholeImpSD;
 			   	valueColumn = new double [signalPixels];
 			   	valueCounter = 0;
 			   	for(int x = 0; x < imp.getWidth(); x++){
 			   		progress.addToBar(0.05/(double)imp.getWidth());
 			   		for(int y = 0; y < imp.getHeight(); y++){
 			   			if(signalPostCorr[x][y]){
-			   				if(wholeImpMin > corrFreqRes[x][y][0] && corrFreqRes[x][y][0] != -1){
-			   					wholeImpMin = corrFreqRes[x][y][0];
-			   				}
-			   				if(wholeImpMax < corrFreqRes[x][y][0]){
-			   					wholeImpMax = corrFreqRes[x][y][0];
-			   				}
 			   				if(corrFreqRes[x][y][0]>=lowerLimit && corrFreqRes[x][y][0]<=upperLimit){
-			   					valueColumn [valueCounter] = corrFreqRes[x][y][0];
+			   					if(wholeImpMin > corrFreqRes[x][y][0] && corrFreqRes[x][y][0] != -1){
+				   					wholeImpMin = corrFreqRes[x][y][0];
+				   				}
+				   				if(wholeImpMax < corrFreqRes[x][y][0]){
+				   					wholeImpMax = corrFreqRes[x][y][0];
+				   				}
+				   				valueColumn [valueCounter] = corrFreqRes[x][y][0];
 				   				valueCounter++;
 			   				}		   				
 			   			}		   			
@@ -471,7 +572,9 @@ public void run(String arg) {
 			   		IJ.log("ERROR IN CODE - 2!!!");
 			   	}
 			   	wholeImpAverage = tools.getAverage(valueColumn);
+			   	wholeImpMedian = tools.getMedian(valueColumn);
 			   	wholeImpSD = tools.getSD(valueColumn);
+			   	//TODO HISTOGRAM histogramBins
 			   	
 			   	//DETERMINE POWER SPECTRUM IN ROI
 			   	assembledPowerSpectrumFromRoi = getAssembledPowerSpectrumInRoi(imp, signalPostCorr, selections[task], smoothWindowSize);
@@ -486,11 +589,16 @@ public void run(String arg) {
 			   	if(assembledPowerSpectrumFromRoi != null){
 			   		assembledPowerSpectrumFromRoiCorr = new double [assembledPowerSpectrumFromRoi.length];
 			   		for(int i = 0; i < assembledPowerSpectrumFromRoi.length; i++){
-				   		assembledPowerSpectrumFromRoiCorr [i] = assembledPowerSpectrumFromRoi [i] - powerSpectrumBackground [0][i] - limitSD * powerSpectrumBackground [1][i];
-	//			   		assembledPowerSpectrumFromRoiCorr [i] = assembledPowerSpectrumFromRoi [i] - powerSpectrumMinimum [i];
-				   		if(assembledPowerSpectrumFromRoiCorr [i] < 0.0){
-				   			assembledPowerSpectrumFromRoiCorr [i] = 0.0;
-				   		}
+			   			if(removeBackgroundInSpectra) {
+			   				assembledPowerSpectrumFromRoiCorr [i] = assembledPowerSpectrumFromRoi [i] - powerSpectrumBackground [0][i] - SDlimitForSpectrumBG * powerSpectrumBackground [1][i];
+			   				//			   		assembledPowerSpectrumFromRoiCorr [i] = assembledPowerSpectrumFromRoi [i] - powerSpectrumMinimum [i];
+			   							   		if(assembledPowerSpectrumFromRoiCorr [i] < 0.0){
+			   							   			assembledPowerSpectrumFromRoiCorr [i] = 0.0;
+			   							   		}
+			   			}else {
+			   				assembledPowerSpectrumFromRoiCorr [i] = assembledPowerSpectrumFromRoi [i];
+			   			}
+				   		
 				   	}
 				   	
 				   	roiFreqs = tools.get2HighestMaximaIndicesWithinRange(assembledPowerSpectrumFromRoiCorr, 
@@ -500,44 +608,56 @@ public void run(String arg) {
 				    roiCom = tools.getCenterOfMassOfRange(assembledPowerSpectrumFromRoiCorr, 0, 
 				    		(assembledPowerSpectrumFromRoiCorr.length/2)-1);
 				    if(roiFreqs[0] >= 0 && roiFreqs [0] < assembledPowerSpectrumFromRoiCorr.length){
-				    	roiAmpl [0] = assembledPowerSpectrumFromRoiCorr [roiFreqs[0]] + powerSpectrumBackground [0][roiFreqs[0]] + limitSD * powerSpectrumBackground [1][roiFreqs[0]];
-				    	roiCorrAmpl [0] = assembledPowerSpectrumFromRoiCorr [roiFreqs[0]];
-	//			    	roiAmpl [0] = assembledPowerSpectrumFromRoiCorr [roiFreqs[0]] + powerSpectrumMinimum [roiFreqs[0]];
-				    	roiCorrSharp [0] = 0.0;
-				    	ctr = 0;
-				    	if(assembledPowerSpectrumFromRoiCorr [roiFreqs[0]-1] != 0.0){
-				    		roiCorrSharp [0] += Math.abs(assembledPowerSpectrumFromRoiCorr [roiFreqs[0]] - assembledPowerSpectrumFromRoiCorr [roiFreqs[0]-1]);
-				    		ctr++;
+				    	if(removeBackgroundInSpectra) {
+				    		roiAmpl [0] = assembledPowerSpectrumFromRoiCorr [roiFreqs[0]] + powerSpectrumBackground [0][roiFreqs[0]] + SDlimitForSpectrumBG * powerSpectrumBackground [1][roiFreqs[0]];
+					    	roiCorrAmpl [0] = assembledPowerSpectrumFromRoiCorr [roiFreqs[0]];
+		//			    	roiAmpl [0] = assembledPowerSpectrumFromRoiCorr [roiFreqs[0]] + powerSpectrumMinimum [roiFreqs[0]];
+					    	roiCorrSharp [0] = 0.0;
+					    	ctr = 0;
+					    	if(assembledPowerSpectrumFromRoiCorr [roiFreqs[0]-1] != 0.0){
+					    		roiCorrSharp [0] += Math.abs(assembledPowerSpectrumFromRoiCorr [roiFreqs[0]] - assembledPowerSpectrumFromRoiCorr [roiFreqs[0]-1]);
+					    		ctr++;
+					    	}
+					    	if(assembledPowerSpectrumFromRoiCorr [roiFreqs[0]+1] != 0.0){
+					    		roiCorrSharp [0] += Math.abs(assembledPowerSpectrumFromRoiCorr [roiFreqs[0]+1] - assembledPowerSpectrumFromRoiCorr [roiFreqs[0]]);
+					    		ctr++;
+					    	}
+					    	if(ctr != 0) roiCorrSharp [0] /= (double) ctr;	
+				    	}else {
+				    		roiAmpl [0] = assembledPowerSpectrumFromRoiCorr [roiFreqs[0]];
 				    	}
-				    	if(assembledPowerSpectrumFromRoiCorr [roiFreqs[0]+1] != 0.0){
-				    		roiCorrSharp [0] += Math.abs(assembledPowerSpectrumFromRoiCorr [roiFreqs[0]+1] - assembledPowerSpectrumFromRoiCorr [roiFreqs[0]]);
-				    		ctr++;
-				    	}
-				    	if(ctr != 0) roiCorrSharp [0] /= (double) ctr;			    	
 				    }else{
 				    	roiAmpl [0] = 0.0;
-				    	roiCorrAmpl [0] = 0.0;
-				    	roiCorrSharp [0] = 0.0;
+				    	if(removeBackgroundInSpectra) {
+				    		roiCorrAmpl [0] = 0.0;
+					    	roiCorrSharp [0] = 0.0;
+				    	}				    	
 				    }
 				    if(roiFreqs[1] >= 0 && roiFreqs [1] < assembledPowerSpectrumFromRoiCorr.length){
-				    	roiAmpl [1] = assembledPowerSpectrumFromRoiCorr [roiFreqs[1]] + powerSpectrumBackground [0][roiFreqs[1]] + limitSD * powerSpectrumBackground [1][roiFreqs[1]];
-				    	roiCorrAmpl [1] = assembledPowerSpectrumFromRoiCorr [roiFreqs[1]];
-	//			    	roiAmpl [1] = assembledPowerSpectrumFromRoiCorr [roiFreqs[1]] + powerSpectrumMinimum [roiFreqs[1]];
-				    	roiCorrSharp [1] = 0.0;
-				    	ctr = 0;
-				    	if(assembledPowerSpectrumFromRoiCorr [roiFreqs[1]-1] != 0.0){
-				    		roiCorrSharp [1] += Math.abs(assembledPowerSpectrumFromRoiCorr [roiFreqs[1]] - assembledPowerSpectrumFromRoiCorr [roiFreqs[1]-1]);
-				    		ctr++;
-				    	}
-				    	if(assembledPowerSpectrumFromRoiCorr [roiFreqs[1]+1] != 0.0){
-				    		roiCorrSharp [1] += Math.abs(assembledPowerSpectrumFromRoiCorr [roiFreqs[1]+1] - assembledPowerSpectrumFromRoiCorr [roiFreqs[1]]);
-				    		ctr++;
-				    	}
-				    	if(ctr != 0) roiCorrSharp [1] /= (double) ctr;
+				    	if(removeBackgroundInSpectra) {
+				    		roiAmpl [1] = assembledPowerSpectrumFromRoiCorr [roiFreqs[1]] + powerSpectrumBackground [0][roiFreqs[1]] + SDlimitForSpectrumBG * powerSpectrumBackground [1][roiFreqs[1]];
+					    	roiCorrAmpl [1] = assembledPowerSpectrumFromRoiCorr [roiFreqs[1]];
+		//			    	roiAmpl [1] = assembledPowerSpectrumFromRoiCorr [roiFreqs[1]] + powerSpectrumMinimum [roiFreqs[1]];
+					    	roiCorrSharp [1] = 0.0;
+					    	ctr = 0;
+					    	if(assembledPowerSpectrumFromRoiCorr [roiFreqs[1]-1] != 0.0){
+					    		roiCorrSharp [1] += Math.abs(assembledPowerSpectrumFromRoiCorr [roiFreqs[1]] - assembledPowerSpectrumFromRoiCorr [roiFreqs[1]-1]);
+					    		ctr++;
+					    	}
+					    	if(assembledPowerSpectrumFromRoiCorr [roiFreqs[1]+1] != 0.0){
+					    		roiCorrSharp [1] += Math.abs(assembledPowerSpectrumFromRoiCorr [roiFreqs[1]+1] - assembledPowerSpectrumFromRoiCorr [roiFreqs[1]]);
+					    		ctr++;
+					    	}
+					    	if(ctr != 0) roiCorrSharp [1] /= (double) ctr;
+				    	}else {
+				    		roiAmpl [1] = assembledPowerSpectrumFromRoiCorr [roiFreqs[1]];					    	
+				    	}				    	
 				    }else{
 				    	roiAmpl [1] = 0.0;
-				    	roiCorrAmpl [1] = 0.0;
-				    	roiCorrSharp [1] = 0.0;
+				    	if(removeBackgroundInSpectra) {
+				    		roiCorrAmpl [1] = 0.0;
+					    	roiCorrSharp [1] = 0.0;
+				    	}
 				    } 	
 			   	}
 			   	
@@ -554,60 +674,78 @@ public void run(String arg) {
 				if(assembledPowerSpectrumFromWholeImp != null){
 					assembledPowerSpectrumFromWholeImpCorr = new double [assembledPowerSpectrumFromWholeImp.length];
 					for(int i = 0; i < assembledPowerSpectrumFromWholeImp.length; i++){
-				   		assembledPowerSpectrumFromWholeImpCorr [i] = assembledPowerSpectrumFromWholeImp [i] - powerSpectrumBackground [0][i] - limitSD * powerSpectrumBackground [1][i];
-	//			   		assembledPowerSpectrumFromWholeImpCorr [i] = assembledPowerSpectrumFromWholeImp [i] - powerSpectrumMinimum [i];
-				   		if(assembledPowerSpectrumFromWholeImpCorr [i] < 0.0){
-				   			assembledPowerSpectrumFromWholeImpCorr [i] = 0.0;
-				   		}
+						if(removeBackgroundInSpectra) {
+							assembledPowerSpectrumFromWholeImpCorr [i] = assembledPowerSpectrumFromWholeImp [i] - powerSpectrumBackground [0][i] - SDlimitForSpectrumBG * powerSpectrumBackground [1][i];
+							//			   		assembledPowerSpectrumFromWholeImpCorr [i] = assembledPowerSpectrumFromWholeImp [i] - powerSpectrumMinimum [i];
+										   		if(assembledPowerSpectrumFromWholeImpCorr [i] < 0.0){
+										   			assembledPowerSpectrumFromWholeImpCorr [i] = 0.0;
+										   		}
+						}else {
+							assembledPowerSpectrumFromWholeImpCorr [i] = assembledPowerSpectrumFromWholeImp [i];
+						}
+				   		
 				   	}
 				   	
 				   	wholeImpFreqs = tools.get2HighestMaximaIndicesWithinRange(assembledPowerSpectrumFromWholeImpCorr, 
 				   			(int)Math.round(lowerLimit*(assembledPowerSpectrumFromRoiCorr.length/sampleRate)), 
 				   			(int)Math.round(upperLimit*(assembledPowerSpectrumFromRoiCorr.length/sampleRate)));
-				    wholeImpAmpl = new double [2];
+				    wholeImpAmpl = new double [2];				    
 				    wholeImpCorrAmpl = new double [2];
 				    wholeImpCorrSharp = new double [2];
 				    wholeImpCom = tools.getCenterOfMassOfRange(assembledPowerSpectrumFromWholeImpCorr, 0, 
 				    		(assembledPowerSpectrumFromWholeImpCorr.length/2)-1);
 				    if(wholeImpFreqs[0] >= 0 && wholeImpFreqs [0] < assembledPowerSpectrumFromWholeImpCorr.length){
-				    	wholeImpAmpl [0] = assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]] + powerSpectrumBackground [0][wholeImpFreqs[0]] + limitSD * powerSpectrumBackground [1][wholeImpFreqs[0]];
-				    	wholeImpCorrAmpl [0] = assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]];
-	//			    	wholeImpAmpl [0] = assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]] + powerSpectrumMinimum [wholeImpFreqs[0]];
-				    	wholeImpCorrSharp [0] = 0.0;
-				    	ctr = 0;
-				    	if(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]-1] != 0.0){
-				    		wholeImpCorrSharp [0] += Math.abs(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]] - assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]-1]);
-				    		ctr++;
+				    	if(removeBackgroundInSpectra) {
+				    		wholeImpAmpl [0] = assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]] + powerSpectrumBackground [0][wholeImpFreqs[0]] + SDlimitForSpectrumBG * powerSpectrumBackground [1][wholeImpFreqs[0]];
+					    	wholeImpCorrAmpl [0] = assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]];
+		//			    	wholeImpAmpl [0] = assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]] + powerSpectrumMinimum [wholeImpFreqs[0]];
+					    	wholeImpCorrSharp [0] = 0.0;
+					    	ctr = 0;
+					    	if(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]-1] != 0.0){
+					    		wholeImpCorrSharp [0] += Math.abs(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]] - assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]-1]);
+					    		ctr++;
+					    	}
+					    	if(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]+1] != 0.0){
+					    		wholeImpCorrSharp [0] += Math.abs(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]+1] - assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]]);
+					    		ctr++;
+					    	}
+					    	if(ctr != 0) wholeImpCorrSharp [0] /= (double) ctr;	
+				    	}else {
+				    		wholeImpAmpl [0] = assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]];
 				    	}
-				    	if(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]+1] != 0.0){
-				    		wholeImpCorrSharp [0] += Math.abs(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]+1] - assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[0]]);
-				    		ctr++;
-				    	}
-				    	if(ctr != 0) wholeImpCorrSharp [0] /= (double) ctr;	
+				    	
 				    }else{
 				    	wholeImpAmpl [0] = 0.0;
-				    	wholeImpCorrAmpl [0] = 0.0;
-				    	wholeImpCorrSharp [0] = 0.0;
+				    	if(removeBackgroundInSpectra) {
+					    	wholeImpCorrAmpl [0] = 0.0;
+					    	wholeImpCorrSharp [0] = 0.0;				    		
+				    	}
 				    }
 				    if(wholeImpFreqs[1] >= 0 && wholeImpFreqs [1] < assembledPowerSpectrumFromWholeImpCorr.length){
-				    	wholeImpAmpl [1] = assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]] + powerSpectrumBackground [0][wholeImpFreqs[1]] + limitSD * powerSpectrumBackground [1][wholeImpFreqs[1]];
-				    	wholeImpCorrAmpl [1] = assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]];
-	//			    	wholeImpAmpl [1] = assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]] + powerSpectrumMinimum [wholeImpFreqs[1]];
-				    	wholeImpCorrSharp [1] = 0.0;
-				    	ctr = 0;
-				    	if(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]-1] != 0.0){
-				    		wholeImpCorrSharp [1] += Math.abs(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]] - assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]-1]);
-				    		ctr++;
+				    	if(removeBackgroundInSpectra) {
+					    	wholeImpAmpl [1] = assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]] + powerSpectrumBackground [0][wholeImpFreqs[1]] + SDlimitForSpectrumBG * powerSpectrumBackground [1][wholeImpFreqs[1]];
+					    	wholeImpCorrAmpl [1] = assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]];
+		//			    	wholeImpAmpl [1] = assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]] + powerSpectrumMinimum [wholeImpFreqs[1]];
+					    	wholeImpCorrSharp [1] = 0.0;
+					    	ctr = 0;
+					    	if(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]-1] != 0.0){
+					    		wholeImpCorrSharp [1] += Math.abs(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]] - assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]-1]);
+					    		ctr++;
+					    	}
+					    	if(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]+1] != 0.0){
+					    		wholeImpCorrSharp [1] += Math.abs(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]+1] - assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]]);
+					    		ctr++;
+					    	}
+					    	if(ctr != 0) wholeImpCorrSharp [1] /= (double) ctr;					    		
+				    	}else {
+				    		wholeImpAmpl [1] = assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]];
 				    	}
-				    	if(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]+1] != 0.0){
-				    		wholeImpCorrSharp [1] += Math.abs(assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]+1] - assembledPowerSpectrumFromWholeImpCorr [wholeImpFreqs[1]]);
-				    		ctr++;
-				    	}
-				    	if(ctr != 0) wholeImpCorrSharp [1] /= (double) ctr;	
 				    }else{
 				    	wholeImpAmpl [1] = 0.0;
-				    	wholeImpCorrAmpl [1] = 0.0;
-				    	wholeImpCorrSharp [1] = 0.0;
+				    	if(removeBackgroundInSpectra) {
+					    	wholeImpCorrAmpl [1] = 0.0;
+					    	wholeImpCorrSharp [1] = 0.0;				    		
+				    	}
 				    }		   	
 				}
 			   	
@@ -670,34 +808,65 @@ public void run(String arg) {
 				tp1.append("	sampling rate (Hz)	" + constants.df6US.format(sampleRate));
 				tp1.append("	sliding window size for smoothing power spectrum (Hz)	" + constants.df6US.format(smoothFreq)	+	"	=	" + constants.df0.format(smoothWindowSize)	+ "	(if = 0 -> no smoothing)");
 				tp1.append("	Percent lower powers used for thresholding power spectrum	" + percentLowest);
-				tp1.append("	SD fold used for power thresholding	" + limitSD);
+				tp1.append("	SD fold used for power thresholding	" + SDlimitForSpectrumBG);
 				tp1.append("	max accepted frequency for filtering (Hz)	" + constants.df6US.format(upperLimit));
 				tp1.append("	min accepted frequency for filtering (Hz)	" + constants.df6US.format(lowerLimit));
+				tp1.append("	histogram bin size (Hz)	" + constants.df6US.format(histogramBins));
+				
+				if(extractSignalsUsingSD) {
+					tp1.append("	Extract signal regions using local SD filter");
+					tp1.append("		Local SD filter - SD threshold:	" + constants.df3US.format(kernelSDThreshold));
+					tp1.append("		Local SD filter - Increase range:	" + extendRange);
+				}else {
+					tp1.append("");
+					tp1.append("");
+					tp1.append("");
+				}
 				
 				tp1.append("");
-				tp1.append("Estimated Parameters");
-				tp1.append("	average of lower powers	" + constants.df6US.format(lowerPowerAvgSD[0]));
-				tp1.append("	standard deviation of lower powers	" + constants.df6US.format(lowerPowerAvgSD[1]));
+				if(removeBackgroundInSpectra) {
+					tp1.append("	Remove background in power spectra - estimated parameters");
+					tp1.append("		average of lower powers	" + constants.df6US.format(lowerPowerAvgSD[0]));
+					tp1.append("		standard deviation of lower powers	" + constants.df6US.format(lowerPowerAvgSD[1]));
+				}else {
+					tp1.append("	No background-removal performed!");
+					tp1.append("");
+					tp1.append("");
+				}
 				
 				tp1.append("");
 				tp1.append("Result (for entire image)");
-				tp1.append("	Average freq (Hz)	SD of freq (Hz)	min freq (Hz)	max freq (Hz)"
+				String appText = "";
+				appText = ("	average freq (Hz)"
+						+ "	median freq (Hz)"
+						+ "	SD of freq (Hz)"
+						+ "	min freq (Hz)"
+						+ "	max freq (Hz)"
 						+ "	lower freq in APS (Hz)"
 						+ "	power of lower freq. in APS (dB)"
 						+ "	higher freq in APS (Hz)"
 						+ "	power of higher freq. in APS (dB)"
 						+ "	COM of APS"
 						+ "	primary freq in APS (Hz)"
-						+ "	power of prim. freq. in APS (dB)"
-						+ "	corrected power of prim. freq. in APS (dB)"
-						+ "	secondary freq in APS (Hz)"
-						+ "	power of sec. freq. in APS (dB)"
-						+ "	corrected power of sec. freq. in APS (dB)"
+						+ "	power of prim. freq. in APS (dB)");
+				if(removeBackgroundInSpectra) {
+					appText +="	corrected power of prim. freq. in APS (dB)";					
+				}else {
+					appText += "	";
+				}
+				appText +="	secondary freq in APS (Hz)"
+						+ "	power of sec. freq. in APS (dB)";
+				if(removeBackgroundInSpectra) {
+					appText +="	corrected power of sec. freq. in APS (dB)"				
 						+ "	corr. sharpness of prim. freq. in APS (dB)"
-						+ "	corr. sharpness of sec. freq. in APS (dB)");
-				String appText = "";
+						+ "	corr. sharpness of sec. freq. in APS (dB)";
+				}else {
+					appText += "			";
+				}
+				tp1.append(appText);
 				if(assembledPowerSpectrumFromWholeImp != null){
 						appText = "	" + constants.df6US.format(wholeImpAverage)
+						+ "	" + constants.df6US.format(wholeImpMedian)
 						+ "	" + constants.df6US.format(wholeImpSD)
 						+ "	" + constants.df6US.format(wholeImpMin)
 						+ "	" + constants.df6US.format(wholeImpMax);
@@ -716,12 +885,20 @@ public void run(String arg) {
 					}
 					appText += "	"; if(wholeImpFreqs[0]!=-1)	appText += constants.df6US.format(wholeImpFreqs [0] * sampleRate / assembledPowerSpectrumFromWholeImp.length);
 					appText += "	"; if(wholeImpFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(wholeImpAmpl [0])*10);
-					appText += "	"; if(wholeImpFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(wholeImpCorrAmpl [0])*10);
+					if(removeBackgroundInSpectra) {
+						appText += "	"; if(wholeImpFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(wholeImpCorrAmpl [0])*10);
+					}else {
+						appText += "	";
+					}
 					appText += "	"; if(wholeImpFreqs[1]!=-1)	appText += constants.df6US.format(wholeImpFreqs [1] * sampleRate / assembledPowerSpectrumFromWholeImp.length);
 					appText += "	"; if(wholeImpFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(wholeImpAmpl [1])*10);
-					appText += "	"; if(wholeImpFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(wholeImpCorrAmpl [1])*10);
-					appText += "	"; if(wholeImpFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(wholeImpCorrSharp [0])*10);
-					appText += "	"; if(wholeImpFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(wholeImpCorrSharp [1])*10);
+					if(removeBackgroundInSpectra) {
+						appText += "	"; if(wholeImpFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(wholeImpCorrAmpl [1])*10);
+						appText += "	"; if(wholeImpFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(wholeImpCorrSharp [0])*10);
+						appText += "	"; if(wholeImpFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(wholeImpCorrSharp [1])*10);						
+					}else {
+						appText += "			";
+					}
 					
 				}			
 				tp1.append(appText);
@@ -740,38 +917,57 @@ public void run(String arg) {
 						appText += "	";	if(assembledPowerSpectrumFromWholeImp[i]!=0.0)	appText += constants.df6US.format(Math.log10(assembledPowerSpectrumFromWholeImp[i])*10);
 				 	}
 					tp1.append(appText);
-					appText = "corrected power (dB)";
-					for(int i = 0; i < assembledPowerSpectrumFromWholeImpCorr.length; i++){
-						appText += "	";	if(assembledPowerSpectrumFromWholeImpCorr[i]!=0.0)	appText += constants.df6US.format(Math.log10(assembledPowerSpectrumFromWholeImpCorr[i])*10);
-				 	}
-					tp1.append(appText);
+					if(removeBackgroundInSpectra) {
+						appText = "corrected power (dB)";
+						for(int i = 0; i < assembledPowerSpectrumFromWholeImpCorr.length; i++){
+							appText += "	";	if(assembledPowerSpectrumFromWholeImpCorr[i]!=0.0)	appText += constants.df6US.format(Math.log10(assembledPowerSpectrumFromWholeImpCorr[i])*10);
+					 	}
+						tp1.append(appText);
+					}else {
+						tp1.append("");
+					}					
 				}else{
 					tp1.append("");
 					tp1.append("");
 					tp1.append("");
 				}
 				
+
+				appText = "";
 				
 				tp1.append("");
 				tp1.append("Result (for selected ROI)");
-				tp1.append("	Average freq (Hz)	SD of freq (Hz)	min freq (Hz)	max freq (Hz)"
+				appText = ("	average freq (Hz)"
+						+ "	median freq (Hz)"
+						+ "	SD of freq (Hz)"
+						+ "	min freq (Hz)"
+						+ "	max freq (Hz)"
 						+ "	lower freq in APS (Hz)"
 						+ "	power of lower freq. in APS (dB)"
 						+ "	higher freq in APS (Hz)"
 						+ "	power of higher freq. in APS (dB)"
 						+ "	COM of APS"
 						+ "	primary freq in APS (Hz)"
-						+ "	power of prim. freq. in APS (dB)"
-						+ "	corrected power of prim. freq. in APS (dB)"
-						+ "	secondary freq in APS (Hz)"
-						+ "	power of sec. freq. in APS (dB)"
-						+ "	corrected power of sec. freq. in APS (dB)"
-						+ "	corr. sharpness of prim. freq. in APS (dB)"
-						+ "	corr. sharpness of sec. freq. in APS (dB)");
-	
-				appText = "";
+						+ "	power of prim. freq. in APS (dB)");
+				if(removeBackgroundInSpectra) {
+					appText +="	corrected power of prim. freq. in APS (dB)";					
+				}else {
+					appText += "	";
+				}
+				appText +="	secondary freq in APS (Hz)"
+						+ "	power of sec. freq. in APS (dB)";
+				if(removeBackgroundInSpectra) {
+					appText +="	corrected power of sec. freq. in APS (dB)"
+							+ "	corr. sharpness of prim. freq. in APS (dB)"
+							+ "	corr. sharpness of sec. freq. in APS (dB)";
+				}		else {
+					appText += "			";
+				}		
+				tp1.append(appText);
+				
 				if(assembledPowerSpectrumFromRoi != null){
 					appText = "	" + constants.df6US.format(roiAverage)
+					+ "	" + constants.df6US.format(roiMedian)
 					+ "	" + constants.df6US.format(roiSD)
 					+ "	" + constants.df6US.format(roiMin)
 					+ "	" + constants.df6US.format(roiMax);
@@ -791,12 +987,20 @@ public void run(String arg) {
 					}
 					appText += "	"; if(roiFreqs[0]!=-1)	appText += constants.df6US.format(roiFreqs [0] * sampleRate / assembledPowerSpectrumFromRoi.length);
 					appText += "	"; if(roiFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(roiAmpl [0])*10);
-					appText += "	"; if(roiFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(roiCorrAmpl [0])*10);
+					if(removeBackgroundInSpectra) {
+						appText += "	"; if(roiFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(roiCorrAmpl [0])*10);
+					}else {
+						appText += "	";
+					}
 					appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(roiFreqs [1] * sampleRate / assembledPowerSpectrumFromRoi.length);
 					appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiAmpl [1])*10);
-					appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiCorrAmpl [1])*10);
-					appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiCorrSharp [0])*10);
-					appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiCorrSharp [1])*10);
+					if(removeBackgroundInSpectra) {
+						appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiCorrAmpl [1])*10);
+						appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiCorrSharp [0])*10);
+						appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiCorrSharp [1])*10);						
+					}else {
+						appText += "			";
+					}
 				}		
 				tp1.append(appText);
 				tp3.append(name[task] + appText);
@@ -814,39 +1018,46 @@ public void run(String arg) {
 						appText += "	";	if(assembledPowerSpectrumFromRoi[i]!=0.0)	appText += constants.df6US.format(Math.log10(assembledPowerSpectrumFromRoi[i])*10);
 				 	}
 					tp1.append(appText);
-					appText = "corrected power (dB)";
-					for(int i = 0; i < assembledPowerSpectrumFromWholeImp.length; i++){
-						appText += "	";	if(assembledPowerSpectrumFromRoiCorr[i]!=0.0)	appText += constants.df6US.format(Math.log10(assembledPowerSpectrumFromRoiCorr[i])*10);
-				 	}
-					tp1.append(appText);
+					if(removeBackgroundInSpectra) {
+						appText = "corrected power (dB)";
+						for(int i = 0; i < assembledPowerSpectrumFromWholeImp.length; i++){
+							appText += "	";	if(assembledPowerSpectrumFromRoiCorr[i]!=0.0)	appText += constants.df6US.format(Math.log10(assembledPowerSpectrumFromRoiCorr[i])*10);
+					 	}
+						tp1.append(appText);
+					}else {
+						tp1.append("");
+					}					
 				}else{
 					tp1.append("");
 					tp1.append("");
 					tp1.append("");
 				}
-				
+								
 				/**
 				 * No longer add detailed results to main file from v0.3.0
 				 * */
 //				addDetailedFrequencyMaps(tp1, imp, signalPostCorr, corrFreqRes);
 				
-				tp1.append("");
-				tp1.append("	Background Power Spectrum");
-				appText = "	frequency (Hz)";
-				for(int i = 0; i < powerSpectrumBackground[0].length; i++){
-					appText += "	" + constants.df6US.format((double)i * sampleRate / (double) powerSpectrumBackground[0].length);
-			 	}
-				tp1.append(appText);
-				appText = "	average power (dB)";
-				for(int i = 0; i < powerSpectrumBackground[0].length; i++){
-					appText += "	" + constants.df6US.format(Math.log10(powerSpectrumBackground [0][i])*10);
-			 	}
-				tp1.append(appText);
-				appText = "	SD of power (dB)";
-				for(int i = 0; i < powerSpectrumBackground[0].length; i++){
-					appText += "	" + constants.df6US.format(Math.log10(powerSpectrumBackground [1][i])*10);
-			 	}
-				tp1.append(appText);
+				if(removeBackgroundInSpectra) {
+					tp1.append("");
+					tp1.append("	Background Power Spectrum");
+					appText = "	frequency (Hz)";
+					for(int i = 0; i < powerSpectrumBackground[0].length; i++){
+						appText += "	" + constants.df6US.format((double)i * sampleRate / (double) powerSpectrumBackground[0].length);
+				 	}
+					tp1.append(appText);
+					appText = "	average power (dB)";
+					for(int i = 0; i < powerSpectrumBackground[0].length; i++){
+						appText += "	" + constants.df6US.format(Math.log10(powerSpectrumBackground [0][i])*10);
+				 	}
+					tp1.append(appText);
+					appText = "	SD of power (dB)";
+					for(int i = 0; i < powerSpectrumBackground[0].length; i++){
+						appText += "	" + constants.df6US.format(Math.log10(powerSpectrumBackground [1][i])*10);
+				 	}
+					tp1.append(appText);
+				}
+				
 				
 	//			tp1.append("	Minimum Power Spectrum");
 	//			appText = "	frequency (Hz)";
@@ -874,7 +1085,9 @@ public void run(String arg) {
 				save2DPlot(rawFreqRes, 5,0, "phase of 1st freq (rad)", filePrefix + "_ph1", true, -Math.PI, Math.PI, "Spectrum");
 				save2DPlot(rawFreqRes, 6,2, "phase of 2nd freq (rad)", filePrefix + "_ph2",true, -Math.PI, Math.PI, "Spectrum");
 	//			save2DPlot(evMapRaw, "eigenvec ph1 (rad)", filePrefix + "_ev1", true, -Math.PI, Math.PI, "Spectrum");
-				saveBooleanAsPlot(signal, "signal region", filePrefix + "_signal");
+				if(removeBackgroundInSpectra) {
+					saveBooleanAsPlot(signal, "signal region", filePrefix + "_signal");
+				}
 				save2DPlot(corrFreqRes, 0,0, "1st freq (Hz)", filePrefix + "_f1_c", true, lowerLimit, upperLimit, "Jet");
 				save2DPlot(corrFreqRes, 2,2, "2nd freq (Hz)", filePrefix + "_f2_c", true, lowerLimit, upperLimit, "Jet");
 				save2DPlot(corrFreqRes, 1,1, "power 1", filePrefix + "_f1p_c", true, 0.0, Double.POSITIVE_INFINITY, "Jet");
@@ -915,16 +1128,18 @@ public void run(String arg) {
 				//plot power spectras
 				xValues = new double [(int)(sampleRate/2.0)];
 				yValues = new double [1][(int)(sampleRate/2.0)];
-				for(int i = 0; i < (int)(sampleRate/2.0); i++){
-					xValues [i] = (double)i * sampleRate / (double) powerSpectrumBackground[0].length;
-					yValues [0][i] = powerSpectrumBackground[0][i];
-			 	}
-				plot2DArray(xValues, yValues, "Power Spectra Background (Mean)", "frequency (Hz)", "power", filePrefix + "_bg_avg", true, new String[]{""});
-				
-				for(int i = 0; i < (int)(sampleRate/2.0); i++){
-					yValues [0][i] = powerSpectrumBackground[1][i];
-			 	}
-				plot2DArray(xValues, yValues, "Power Spectra Background (SD)", "frequency (Hz)", "power", filePrefix + "_bg_sd", true, new String[]{""});
+				if(removeBackgroundInSpectra) {
+					for(int i = 0; i < (int)(sampleRate/2.0); i++){
+						xValues [i] = (double)i * sampleRate / (double) powerSpectrumBackground[0].length;
+						yValues [0][i] = powerSpectrumBackground[0][i];
+					}
+					plot2DArray(xValues, yValues, "Power Spectra Background (Mean)", "frequency (Hz)", "power", filePrefix + "_bg_avg", true, new String[]{""});
+						
+					for(int i = 0; i < (int)(sampleRate/2.0); i++){
+						yValues [0][i] = powerSpectrumBackground[1][i];
+					}
+					plot2DArray(xValues, yValues, "Power Spectra Background (SD)", "frequency (Hz)", "power", filePrefix + "_bg_sd", true, new String[]{""});
+				}
 				
 				if(assembledPowerSpectrumFromWholeImp != null){
 					for(int i = 0; i < (int)(sampleRate/2.0); i++){
@@ -932,22 +1147,27 @@ public void run(String arg) {
 				 	}
 					plot2DArray(xValues, yValues, "Power Spectrum - entire image", "frequency (Hz)", "power", filePrefix + "_psw", true, new String[]{""});
 					
-					for(int i = 0; i < (int)(sampleRate/2.0); i++){
-						yValues [0][i] = assembledPowerSpectrumFromWholeImpCorr[i];
-				 	}
-					plot2DArray(xValues, yValues, "Power Spectrum - entire image", "frequency (Hz)", "power", filePrefix + "_psw_c", true, new String[]{""});
+					if(removeBackgroundInSpectra) {						
+						for(int i = 0; i < (int)(sampleRate/2.0); i++){
+							yValues [0][i] = assembledPowerSpectrumFromWholeImpCorr[i];
+					 	}
+						plot2DArray(xValues, yValues, "Power Spectrum - entire image", "frequency (Hz)", "power", filePrefix + "_psw_c", true, new String[]{""});
+					}
 				}			
 				
 				if(assembledPowerSpectrumFromRoi != null){
+					//TODO show only from certain value on!!!
 					for(int i = 0; i < (int)(sampleRate/2.0); i++){
 						yValues [0][i] = assembledPowerSpectrumFromRoi[i];
 				 	}
 					plot2DArray(xValues, yValues, "Power Spectrum - entire roi", "frequency (Hz)", "power", filePrefix + "_psr", true, new String[]{""});	
 					
-					for(int i = 0; i < (int)(sampleRate/2.0); i++){
-						yValues [0][i] = assembledPowerSpectrumFromRoiCorr[i];
-				 	}
-					plot2DArray(xValues, yValues, "Power Spectrum - entire roi", "frequency (Hz)", "power", filePrefix + "_psr_c", true, new String[]{""});
+					if(removeBackgroundInSpectra) {						
+						for(int i = 0; i < (int)(sampleRate/2.0); i++){
+							yValues [0][i] = assembledPowerSpectrumFromRoiCorr[i];
+					 	}
+						plot2DArray(xValues, yValues, "Power Spectrum - entire roi", "frequency (Hz)", "power", filePrefix + "_psr_c", true, new String[]{""});
+					}
 				}
 				
 				re = new RoiEncoder(filePrefix + "_roi");
@@ -969,7 +1189,8 @@ public void run(String arg) {
 					break running;
 				}
 			}catch(Exception e){
-				String out = "";
+				String out = "" + e.getMessage() + "\n";
+				out += "" + e.getLocalizedMessage() + "\n";
 				for(int err = 0; err < e.getStackTrace().length; err++){
 					out += " \n " + e.getStackTrace()[err].toString();
 				}			
@@ -1078,6 +1299,10 @@ private void addFooter(TextPanel tp, Date currentDate){
 	tp.append("Plug-in version:	V"+PLUGINVERSION);	
 }
 
+/**
+ * @deprecated
+ * Not fully developed
+ * */
 private static double [] getFrequenciesWithPower (double [] values, double sampleRate, boolean showPlot, boolean normalizePlusMinus, int smoothWindowSize, double lowerLimit, double upperLimit){
 	//DoubleFFT package from: http://incanter.org/docs/parallelcolt/api/edu/emory/mathcs/jtransforms/fft/DoubleFFT_1D.html
 	DoubleFFT_1D fftDo = new DoubleFFT_1D(values.length);	
@@ -2046,7 +2271,7 @@ public static void saveBooleanAsPlot(boolean [][] map, String title, String save
 }
 
 
-private static boolean [][] getSignalRegionsBySD(double [][][] frequencies, double SDThreshold){
+private static boolean [][] getSignalRegionsBySD(double [][][] frequencies, double SDThreshold, boolean extendedRange){
 	boolean [][] output = new boolean [frequencies.length][frequencies[0].length];
 	for(int x = 0; x < output.length; x++){
 		Arrays.fill(output [x], false);
@@ -2069,34 +2294,36 @@ private static boolean [][] getSignalRegionsBySD(double [][][] frequencies, doub
 				}
 			}
 			
-			if(x-2 >= 0) {
-				values [counter] = frequencies[x-2][y][0];
-				if(values[counter]>0.0){
-					counter++;
+			if(extendedRange) {
+				if(x-2 >= 0) {
+					values [counter] = frequencies[x-2][y][0];
+					if(values[counter]>0.0){
+						counter++;
+					}
+				}
+				
+				if(x+2 < frequencies.length) {
+					values [counter] = frequencies[x+2][y][0];
+					if(values[counter]>0.0){
+						counter++;
+					}
+				}
+				
+				if(y-2 >= 0) {
+					values [counter] = frequencies[x][y-2][0];
+					if(values[counter]>0.0){
+						counter++;
+					}
+				}
+				
+				if(y+2 < frequencies[0].length) {
+					values [counter] = frequencies[x][y+2][0];
+					if(values[counter]>0.0){
+						counter++;
+					}
 				}
 			}
-			
-			if(x+2 < frequencies.length) {
-				values [counter] = frequencies[x+2][y][0];
-				if(values[counter]>0.0){
-					counter++;
-				}
-			}
-			
-			if(y-2 >= 0) {
-				values [counter] = frequencies[x][y-2][0];
-				if(values[counter]>0.0){
-					counter++;
-				}
-			}
-			
-			if(y+2 < frequencies[0].length) {
-				values [counter] = frequencies[x][y+2][0];
-				if(values[counter]>0.0){
-					counter++;
-				}
-			}
-			
+
 			if(counter<6){
 				continue;
 			}else if(counter == 13){
@@ -2110,7 +2337,8 @@ private static boolean [][] getSignalRegionsBySD(double [][][] frequencies, doub
 //				for(int vr = 0; vr < valueRange.length; vr++) {
 //					IJ.log("vr: " + valueRange[vr]);
 //				}
-			}			
+			}
+									
 			SD = tools.getSD(valueRange);
 //			IJ.log("SD: " + SD);
 			if(SD < SDThreshold){
@@ -2424,5 +2652,10 @@ private static LUT getLUT(double [][] array, boolean multiplyWith255) {
 	}else {
 		return new LUT (8,red.length,red,green,blue);
 	}	
+}
+
+private static double [] getHistogram(double input [], int min, int max, double binSize) {
+	//TODO
+	return new double [] {0.0,0.0};
 }
 }//end main class
