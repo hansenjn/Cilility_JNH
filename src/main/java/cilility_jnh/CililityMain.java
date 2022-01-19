@@ -110,6 +110,8 @@ public class CililityMain implements PlugIn, Measurements {
 	double smoothFreq = 5.0;
 	int smoothWindowSize = 5;
 	
+	boolean enhancedOutput = false;
+	
 	static final String[] outputVariant = {"save as filename + suffix 'Cil'", "save as filename + suffix 'Cil' + date"};
 	String selectedOutputVariant = outputVariant[0];
 		
@@ -128,7 +130,7 @@ public void run(String arg) {
 	GenericDialog gd = new GenericDialog(PLUGINNAME + " - set parameters");	
 	//show Dialog-----------------------------------------------------------------
 	//.setInsets(top, left, bottom)
-	gd.setInsets(0,0,0);		gd.addMessage(PLUGINNAME + ", Version " + PLUGINVERSION + ", \u00a9 2019-2022 JN Hansen", SuperHeadingFont);	
+	gd.setInsets(0,0,0);		gd.addMessage(PLUGINNAME + ", Version " + PLUGINVERSION + ", \u00a9 2019-2022 JN Hansen", HeadingFont);	
 	gd.setInsets(5,0,0);		gd.addChoice("Process ", taskVariant, selectedTaskVariant);
 	gd.setInsets(0, 0, 0);	gd.addNumericField("Recording frequency (Hz)", sampleRate, 2);
 	gd.setInsets(0, 0, 0);	gd.addNumericField("Sliding window to smooth power spectrum (Hz)", smoothFreq, 2);
@@ -169,6 +171,7 @@ public void run(String arg) {
 	
 	gd.setInsets(10,0,0);		gd.addMessage("Output settings", SubHeadingFont);
 	gd.setInsets(0, 5, 0);	gd.addNumericField("Bin size in histograms (Hz)", histogramBins, 2);
+	gd.setInsets(0, 0, 0);	gd.addCheckbox("Output complex maps (phase, com, ...)", enhancedOutput);
 	gd.setInsets(0,0,0);	gd.addChoice("Output file names ", outputVariant, selectedOutputVariant);
 	gd.showDialog();
 	//show Dialog-----------------------------------------------------------------
@@ -192,6 +195,7 @@ public void run(String arg) {
 	manualROI = gd.getNextBoolean();
 
 	histogramBins = gd.getNextNumber();
+	enhancedOutput = gd.getNextBoolean();
 	selectedOutputVariant = gd.getNextChoice();	
 	
 	//read and process variables--------------------------------------------------
@@ -295,7 +299,7 @@ public void run(String arg) {
 	//Request ROIs
 	Roi [] selections = new Roi [tasks];
    	ImagePlus imp; 	  	
-   	if(manualROI){	//TODO implement when no ROI selected!!!
+   	if(manualROI){
 		IJ.setTool("polygon");
 		{
 			for(int task = 0; task < tasks; task++){
@@ -331,10 +335,7 @@ public void run(String arg) {
 			}
 		}
 		System.gc();
-	}
-   	
-   	//TODO implement that selection files are only processed when selection exists!
-	
+	}	
 	
    	//Initialize
    	double [][][] phaseMapRoiFreqs;
@@ -495,57 +496,81 @@ public void run(String arg) {
 			   		}
 			   	}
 			   	
-			   	//GET NUMBER OF SIGNAL PIXELS IN ROI
-	//		   	boolean signalPostCorr [][] = signal;
-			   	int signalPixels = 0;
-			   	for(int x = 0; x < imp.getWidth(); x++){
-			   		progress.addToBar(0.04/(double)imp.getWidth());
-			   		for(int y = 0; y < imp.getHeight(); y++){
-			   			if(selections[task].contains(x, y) && signalPostCorr [x][y]){
-			   				if(corrFreqRes[x][y][0]>=lowerLimit && corrFreqRes[x][y][0]<=upperLimit){
-			   					signalPixels++;
-			   				}		   				
-			   			}
-				   	}	
-			   	}
 			   	
-			   	//DETERMINE PARAMETERS FOR SELECTION
-			   	double roiMin = Double.POSITIVE_INFINITY, roiMax = Double.NEGATIVE_INFINITY, roiAverage, roiMedian, roiSD;
-			   	valueColumn = new double [signalPixels];
-			   	signalPixels = 0;
-			   	int valueCounter = 0;
-			   	for(int x = 0; x < imp.getWidth(); x++){
-			   		progress.addToBar(0.05/(double)imp.getWidth());
-			   		for(int y = 0; y < imp.getHeight(); y++){
-			   			if(signalPostCorr[x][y]){
-			   				if(selections[task].contains(x, y)){
-				   				if(corrFreqRes[x][y][0]>=lowerLimit && corrFreqRes[x][y][0]<=upperLimit){
-				   					if(roiMin > corrFreqRes[x][y][0] && corrFreqRes[x][y][0] != -1){
-					   					roiMin = corrFreqRes[x][y][0];
-					   				}
-					   				if(roiMax < corrFreqRes[x][y][0]){
-					   					roiMax = corrFreqRes[x][y][0];
-					   				}
-				   					
-				   					valueColumn [valueCounter] = corrFreqRes[x][y][0];
-					   				valueCounter++;
-					   				signalPixels++;
-				   				}		   				
-				   			}else{
+			   	int signalPixels;
+			   	int valueCounter;
+			   	
+			   	/**
+			   	 * Get region results &| number of signal pixels
+			   	 * */
+			   	double roiMin = Double.POSITIVE_INFINITY, roiMax = Double.NEGATIVE_INFINITY, 
+			   			roiAverage = Double.NaN, roiMedian = Double.NaN, roiSD = Double.NaN;
+	   			if(manualROI) {
+	   				//Get Number of signal pixels
+//	   				boolean signalPostCorr [][] = signal;
+	   				signalPixels = 0;
+				   	for(int x = 0; x < imp.getWidth(); x++){
+				   		progress.addToBar(0.04/(double)imp.getWidth());
+				   		for(int y = 0; y < imp.getHeight(); y++){
+				   			if(selections[task].contains(x, y) && signalPostCorr [x][y]){
 				   				if(corrFreqRes[x][y][0]>=lowerLimit && corrFreqRes[x][y][0]<=upperLimit){
 				   					signalPixels++;
-				   				}
+				   				}		   				
 				   			}
-			   			}
-				   	}	
-			   	}		   	
-			   	if(valueCounter != valueColumn.length){
-			   		IJ.log("ERROR IN CODE!!!");
-			   	}
-			   	roiAverage = tools.getAverage(valueColumn);
-			   	roiMedian = tools.getMedian(valueColumn);
-			   	roiSD = tools.getSD(valueColumn);
-			   	//TODO HISTOGRAM histogramBins
+					   	}	
+				   	}
+				   	
+				  //DETERMINE PARAMETERS FOR SELECTION
+				   	valueColumn = new double [signalPixels];
+				   	signalPixels = 0;
+				   	valueCounter = 0;
+				   	for(int x = 0; x < imp.getWidth(); x++){
+				   		progress.addToBar(0.05/(double)imp.getWidth());
+				   		for(int y = 0; y < imp.getHeight(); y++){
+				   			if(signalPostCorr[x][y]){
+				   				if(selections[task].contains(x, y)){
+					   				if(corrFreqRes[x][y][0]>=lowerLimit && corrFreqRes[x][y][0]<=upperLimit){
+					   					if(roiMin > corrFreqRes[x][y][0] && corrFreqRes[x][y][0] != -1){
+						   					roiMin = corrFreqRes[x][y][0];
+						   				}
+						   				if(roiMax < corrFreqRes[x][y][0]){
+						   					roiMax = corrFreqRes[x][y][0];
+						   				}
+					   					
+					   					valueColumn [valueCounter] = corrFreqRes[x][y][0];
+						   				valueCounter++;
+						   				signalPixels++;
+					   				}		   				
+					   			}else{
+					   				if(corrFreqRes[x][y][0]>=lowerLimit && corrFreqRes[x][y][0]<=upperLimit){
+					   					signalPixels++;
+					   				}
+					   			}
+				   			}
+					   	}	
+				   	}		   	
+				   	if(valueCounter != valueColumn.length){
+				   		IJ.log("ERROR IN CODE!!!");
+				   	}
+				   	roiAverage = tools.getAverage(valueColumn);
+				   	roiMedian = tools.getMedian(valueColumn);
+				   	roiSD = tools.getSD(valueColumn);
+				   	//TODO Determine HISTOGRAM histogramBins
+	   			}else {
+	   				signalPixels = 0;
+	   				for(int x = 0; x < imp.getWidth(); x++){
+				   		progress.addToBar(0.04/(double)imp.getWidth());
+				   		for(int y = 0; y < imp.getHeight(); y++){
+				   			if(signalPostCorr [x][y]){
+				   				if(corrFreqRes[x][y][0]>=lowerLimit && corrFreqRes[x][y][0]<=upperLimit){
+				   					signalPixels++;
+				   				}		   				
+				   			}
+					   	}	
+				   	}
+	   			}
+
+			   	
 			   	
 			  //DETERMINE PARAMETERS FOR ENTIRE IMAGE
 			   	double wholeImpMin = Double.POSITIVE_INFINITY, wholeImpMax = Double.NEGATIVE_INFINITY, wholeImpAverage, wholeImpMedian, wholeImpSD;
@@ -574,10 +599,10 @@ public void run(String arg) {
 			   	wholeImpAverage = tools.getAverage(valueColumn);
 			   	wholeImpMedian = tools.getMedian(valueColumn);
 			   	wholeImpSD = tools.getSD(valueColumn);
-			   	//TODO HISTOGRAM histogramBins
+			   	//TODO Determin HISTOGRAM histogramBins
 			   	
 			   	//DETERMINE POWER SPECTRUM IN ROI
-			   	assembledPowerSpectrumFromRoi = getAssembledPowerSpectrumInRoi(imp, signalPostCorr, selections[task], smoothWindowSize);
+			   	assembledPowerSpectrumFromRoi = new double [0];
 			   	assembledPowerSpectrumFromRoiCorr = new double [0];
 			   	roiFreqs = new int [2];
 			   	roiAmpl = new double [2];
@@ -586,82 +611,84 @@ public void run(String arg) {
 				roiCom = 0.0;
 				ctr = 0;
 			   	
-			   	if(assembledPowerSpectrumFromRoi != null){
-			   		assembledPowerSpectrumFromRoiCorr = new double [assembledPowerSpectrumFromRoi.length];
-			   		for(int i = 0; i < assembledPowerSpectrumFromRoi.length; i++){
-			   			if(removeBackgroundInSpectra) {
-			   				assembledPowerSpectrumFromRoiCorr [i] = assembledPowerSpectrumFromRoi [i] - powerSpectrumBackground [0][i] - SDlimitForSpectrumBG * powerSpectrumBackground [1][i];
-			   				//			   		assembledPowerSpectrumFromRoiCorr [i] = assembledPowerSpectrumFromRoi [i] - powerSpectrumMinimum [i];
-			   							   		if(assembledPowerSpectrumFromRoiCorr [i] < 0.0){
-			   							   			assembledPowerSpectrumFromRoiCorr [i] = 0.0;
-			   							   		}
-			   			}else {
-			   				assembledPowerSpectrumFromRoiCorr [i] = assembledPowerSpectrumFromRoi [i];
-			   			}
-				   		
+				if(manualROI) {
+					assembledPowerSpectrumFromRoi = getAssembledPowerSpectrumInRoi(imp, signalPostCorr, selections[task], smoothWindowSize);
+					
+					if(assembledPowerSpectrumFromRoi != null){
+				   		assembledPowerSpectrumFromRoiCorr = new double [assembledPowerSpectrumFromRoi.length];
+				   		for(int i = 0; i < assembledPowerSpectrumFromRoi.length; i++){
+				   			if(removeBackgroundInSpectra) {
+				   				assembledPowerSpectrumFromRoiCorr [i] = assembledPowerSpectrumFromRoi [i] - powerSpectrumBackground [0][i] - SDlimitForSpectrumBG * powerSpectrumBackground [1][i];
+				   				//			   		assembledPowerSpectrumFromRoiCorr [i] = assembledPowerSpectrumFromRoi [i] - powerSpectrumMinimum [i];
+				   							   		if(assembledPowerSpectrumFromRoiCorr [i] < 0.0){
+				   							   			assembledPowerSpectrumFromRoiCorr [i] = 0.0;
+				   							   		}
+				   			}else {
+				   				assembledPowerSpectrumFromRoiCorr [i] = assembledPowerSpectrumFromRoi [i];
+				   			}
+					   		
+					   	}
+					   	
+					   	roiFreqs = tools.get2HighestMaximaIndicesWithinRange(assembledPowerSpectrumFromRoiCorr, 
+					   			(int)Math.round(lowerLimit*(assembledPowerSpectrumFromRoiCorr.length/sampleRate)), 
+					   			(int)Math.round(upperLimit*(assembledPowerSpectrumFromRoiCorr.length/sampleRate)));
+					    
+					    roiCom = tools.getCenterOfMassOfRange(assembledPowerSpectrumFromRoiCorr, 0, 
+					    		(assembledPowerSpectrumFromRoiCorr.length/2)-1);
+					    if(roiFreqs[0] >= 0 && roiFreqs [0] < assembledPowerSpectrumFromRoiCorr.length){
+					    	if(removeBackgroundInSpectra) {
+					    		roiAmpl [0] = assembledPowerSpectrumFromRoiCorr [roiFreqs[0]] + powerSpectrumBackground [0][roiFreqs[0]] + SDlimitForSpectrumBG * powerSpectrumBackground [1][roiFreqs[0]];
+						    	roiCorrAmpl [0] = assembledPowerSpectrumFromRoiCorr [roiFreqs[0]];
+			//			    	roiAmpl [0] = assembledPowerSpectrumFromRoiCorr [roiFreqs[0]] + powerSpectrumMinimum [roiFreqs[0]];
+						    	roiCorrSharp [0] = 0.0;
+						    	ctr = 0;
+						    	if(assembledPowerSpectrumFromRoiCorr [roiFreqs[0]-1] != 0.0){
+						    		roiCorrSharp [0] += Math.abs(assembledPowerSpectrumFromRoiCorr [roiFreqs[0]] - assembledPowerSpectrumFromRoiCorr [roiFreqs[0]-1]);
+						    		ctr++;
+						    	}
+						    	if(assembledPowerSpectrumFromRoiCorr [roiFreqs[0]+1] != 0.0){
+						    		roiCorrSharp [0] += Math.abs(assembledPowerSpectrumFromRoiCorr [roiFreqs[0]+1] - assembledPowerSpectrumFromRoiCorr [roiFreqs[0]]);
+						    		ctr++;
+						    	}
+						    	if(ctr != 0) roiCorrSharp [0] /= (double) ctr;	
+					    	}else {
+					    		roiAmpl [0] = assembledPowerSpectrumFromRoiCorr [roiFreqs[0]];
+					    	}
+					    }else{
+					    	roiAmpl [0] = 0.0;
+					    	if(removeBackgroundInSpectra) {
+					    		roiCorrAmpl [0] = 0.0;
+						    	roiCorrSharp [0] = 0.0;
+					    	}				    	
+					    }
+					    if(roiFreqs[1] >= 0 && roiFreqs [1] < assembledPowerSpectrumFromRoiCorr.length){
+					    	if(removeBackgroundInSpectra) {
+					    		roiAmpl [1] = assembledPowerSpectrumFromRoiCorr [roiFreqs[1]] + powerSpectrumBackground [0][roiFreqs[1]] + SDlimitForSpectrumBG * powerSpectrumBackground [1][roiFreqs[1]];
+						    	roiCorrAmpl [1] = assembledPowerSpectrumFromRoiCorr [roiFreqs[1]];
+			//			    	roiAmpl [1] = assembledPowerSpectrumFromRoiCorr [roiFreqs[1]] + powerSpectrumMinimum [roiFreqs[1]];
+						    	roiCorrSharp [1] = 0.0;
+						    	ctr = 0;
+						    	if(assembledPowerSpectrumFromRoiCorr [roiFreqs[1]-1] != 0.0){
+						    		roiCorrSharp [1] += Math.abs(assembledPowerSpectrumFromRoiCorr [roiFreqs[1]] - assembledPowerSpectrumFromRoiCorr [roiFreqs[1]-1]);
+						    		ctr++;
+						    	}
+						    	if(assembledPowerSpectrumFromRoiCorr [roiFreqs[1]+1] != 0.0){
+						    		roiCorrSharp [1] += Math.abs(assembledPowerSpectrumFromRoiCorr [roiFreqs[1]+1] - assembledPowerSpectrumFromRoiCorr [roiFreqs[1]]);
+						    		ctr++;
+						    	}
+						    	if(ctr != 0) roiCorrSharp [1] /= (double) ctr;
+					    	}else {
+					    		roiAmpl [1] = assembledPowerSpectrumFromRoiCorr [roiFreqs[1]];					    	
+					    	}				    	
+					    }else{
+					    	roiAmpl [1] = 0.0;
+					    	if(removeBackgroundInSpectra) {
+					    		roiCorrAmpl [1] = 0.0;
+						    	roiCorrSharp [1] = 0.0;
+					    	}
+					    } 	
 				   	}
-				   	
-				   	roiFreqs = tools.get2HighestMaximaIndicesWithinRange(assembledPowerSpectrumFromRoiCorr, 
-				   			(int)Math.round(lowerLimit*(assembledPowerSpectrumFromRoiCorr.length/sampleRate)), 
-				   			(int)Math.round(upperLimit*(assembledPowerSpectrumFromRoiCorr.length/sampleRate)));
-				    
-				    roiCom = tools.getCenterOfMassOfRange(assembledPowerSpectrumFromRoiCorr, 0, 
-				    		(assembledPowerSpectrumFromRoiCorr.length/2)-1);
-				    if(roiFreqs[0] >= 0 && roiFreqs [0] < assembledPowerSpectrumFromRoiCorr.length){
-				    	if(removeBackgroundInSpectra) {
-				    		roiAmpl [0] = assembledPowerSpectrumFromRoiCorr [roiFreqs[0]] + powerSpectrumBackground [0][roiFreqs[0]] + SDlimitForSpectrumBG * powerSpectrumBackground [1][roiFreqs[0]];
-					    	roiCorrAmpl [0] = assembledPowerSpectrumFromRoiCorr [roiFreqs[0]];
-		//			    	roiAmpl [0] = assembledPowerSpectrumFromRoiCorr [roiFreqs[0]] + powerSpectrumMinimum [roiFreqs[0]];
-					    	roiCorrSharp [0] = 0.0;
-					    	ctr = 0;
-					    	if(assembledPowerSpectrumFromRoiCorr [roiFreqs[0]-1] != 0.0){
-					    		roiCorrSharp [0] += Math.abs(assembledPowerSpectrumFromRoiCorr [roiFreqs[0]] - assembledPowerSpectrumFromRoiCorr [roiFreqs[0]-1]);
-					    		ctr++;
-					    	}
-					    	if(assembledPowerSpectrumFromRoiCorr [roiFreqs[0]+1] != 0.0){
-					    		roiCorrSharp [0] += Math.abs(assembledPowerSpectrumFromRoiCorr [roiFreqs[0]+1] - assembledPowerSpectrumFromRoiCorr [roiFreqs[0]]);
-					    		ctr++;
-					    	}
-					    	if(ctr != 0) roiCorrSharp [0] /= (double) ctr;	
-				    	}else {
-				    		roiAmpl [0] = assembledPowerSpectrumFromRoiCorr [roiFreqs[0]];
-				    	}
-				    }else{
-				    	roiAmpl [0] = 0.0;
-				    	if(removeBackgroundInSpectra) {
-				    		roiCorrAmpl [0] = 0.0;
-					    	roiCorrSharp [0] = 0.0;
-				    	}				    	
-				    }
-				    if(roiFreqs[1] >= 0 && roiFreqs [1] < assembledPowerSpectrumFromRoiCorr.length){
-				    	if(removeBackgroundInSpectra) {
-				    		roiAmpl [1] = assembledPowerSpectrumFromRoiCorr [roiFreqs[1]] + powerSpectrumBackground [0][roiFreqs[1]] + SDlimitForSpectrumBG * powerSpectrumBackground [1][roiFreqs[1]];
-					    	roiCorrAmpl [1] = assembledPowerSpectrumFromRoiCorr [roiFreqs[1]];
-		//			    	roiAmpl [1] = assembledPowerSpectrumFromRoiCorr [roiFreqs[1]] + powerSpectrumMinimum [roiFreqs[1]];
-					    	roiCorrSharp [1] = 0.0;
-					    	ctr = 0;
-					    	if(assembledPowerSpectrumFromRoiCorr [roiFreqs[1]-1] != 0.0){
-					    		roiCorrSharp [1] += Math.abs(assembledPowerSpectrumFromRoiCorr [roiFreqs[1]] - assembledPowerSpectrumFromRoiCorr [roiFreqs[1]-1]);
-					    		ctr++;
-					    	}
-					    	if(assembledPowerSpectrumFromRoiCorr [roiFreqs[1]+1] != 0.0){
-					    		roiCorrSharp [1] += Math.abs(assembledPowerSpectrumFromRoiCorr [roiFreqs[1]+1] - assembledPowerSpectrumFromRoiCorr [roiFreqs[1]]);
-					    		ctr++;
-					    	}
-					    	if(ctr != 0) roiCorrSharp [1] /= (double) ctr;
-				    	}else {
-				    		roiAmpl [1] = assembledPowerSpectrumFromRoiCorr [roiFreqs[1]];					    	
-				    	}				    	
-				    }else{
-				    	roiAmpl [1] = 0.0;
-				    	if(removeBackgroundInSpectra) {
-				    		roiCorrAmpl [1] = 0.0;
-					    	roiCorrSharp [1] = 0.0;
-				    	}
-				    } 	
-			   	}
-			   	
-			   	
+				}
 			    
 			  //DETERMINE POWER SPECTRUM IN ENTIRE IMAGE
 			   	assembledPowerSpectrumFromWholeImp = getAssembledPowerSpectrum(imp, signalPostCorr, smoothWindowSize);
@@ -687,8 +714,8 @@ public void run(String arg) {
 				   	}
 				   	
 				   	wholeImpFreqs = tools.get2HighestMaximaIndicesWithinRange(assembledPowerSpectrumFromWholeImpCorr, 
-				   			(int)Math.round(lowerLimit*(assembledPowerSpectrumFromRoiCorr.length/sampleRate)), 
-				   			(int)Math.round(upperLimit*(assembledPowerSpectrumFromRoiCorr.length/sampleRate)));
+				   			(int)Math.round(lowerLimit*(assembledPowerSpectrumFromWholeImpCorr.length/sampleRate)), 
+				   			(int)Math.round(upperLimit*(assembledPowerSpectrumFromWholeImpCorr.length/sampleRate)));
 				    wholeImpAmpl = new double [2];				    
 				    wholeImpCorrAmpl = new double [2];
 				    wholeImpCorrSharp = new double [2];
@@ -750,32 +777,48 @@ public void run(String arg) {
 				}
 			   	
 				//GET Phases for specific frequency
-				phaseMapRoiFreqs = new double [imp.getWidth()][imp.getHeight()][2];
-				phaseMapWholeImpFreqs = new double [imp.getWidth()][imp.getHeight()][2];
 				locFreqs = new double [4];
-	   			locFreqs [0] = roiFreqs [0] * sampleRate / assembledPowerSpectrumFromRoi.length;
-	   			locFreqs [1] = roiFreqs [1] * sampleRate / assembledPowerSpectrumFromRoi.length;
-	   			locFreqs [2] = wholeImpFreqs [0] * sampleRate / assembledPowerSpectrumFromRoi.length;
-	   			locFreqs [3] = wholeImpFreqs [1] * sampleRate / assembledPowerSpectrumFromRoi.length;
-	   			double [] phases; 
-			   	valueColumn = new double [imp.getStackSize()];
-				for(int x = 0; x < imp.getWidth(); x++){
-			   		progress.addToBar(0.25/(double)imp.getWidth());
-			   		for(int y = 0; y < imp.getHeight(); y++){
-			   			if(!signalPostCorr[x][y]) continue;
-			   			
-			   			for(int i = 0; i < imp.getStackSize(); i++){
-			   				valueColumn [i] = imp.getStack().getVoxel(x, y, i);
-			   			}
-			   			phases = getPhaseOfSpecificFrequencies(valueColumn, sampleRate, false, true, locFreqs);
-			   			
-			   			phaseMapRoiFreqs [x][y][0] = phases [0];
-			   			phaseMapRoiFreqs [x][y][1] = phases [1];
-			   			phaseMapWholeImpFreqs [x][y][0] = phases [2];
-			   			phaseMapWholeImpFreqs [x][y][1] = phases [3];
-				   	}	
-			   	}
-				
+				if(manualROI) {
+		   			locFreqs [0] = roiFreqs [0] * sampleRate / assembledPowerSpectrumFromRoi.length;
+		   			locFreqs [1] = roiFreqs [1] * sampleRate / assembledPowerSpectrumFromRoi.length;					
+				}else {
+					locFreqs [0] = 0.0;
+					locFreqs [1] = 0.0;
+				}
+	   			
+	   			locFreqs [2] = wholeImpFreqs [0] * sampleRate / assembledPowerSpectrumFromWholeImp.length;
+	   			locFreqs [3] = wholeImpFreqs [1] * sampleRate / assembledPowerSpectrumFromWholeImp.length;
+	   			
+   				phaseMapRoiFreqs = new double [0][0][0];
+   				phaseMapWholeImpFreqs = new double [0][0][0];
+	   			if(enhancedOutput) {
+					if(manualROI) {
+						phaseMapRoiFreqs = new double [imp.getWidth()][imp.getHeight()][2];
+					}
+					phaseMapWholeImpFreqs = new double [imp.getWidth()][imp.getHeight()][2];		   			
+				   	valueColumn = new double [imp.getStackSize()];
+		   			double [] phases;
+					for(int x = 0; x < imp.getWidth(); x++){
+				   		progress.addToBar(0.25/(double)imp.getWidth());
+				   		for(int y = 0; y < imp.getHeight(); y++){
+				   			if(!signalPostCorr[x][y]) continue;
+				   			
+				   			for(int i = 0; i < imp.getStackSize(); i++){
+				   				valueColumn [i] = imp.getStack().getVoxel(x, y, i);
+				   			}
+				   			phases = getPhaseOfSpecificFrequencies(valueColumn, sampleRate, false, true, locFreqs);
+				   			
+				   			if(manualROI) {
+					   			phaseMapRoiFreqs [x][y][0] = phases [0];
+					   			phaseMapRoiFreqs [x][y][1] = phases [1];			   				
+				   			}
+				   			phaseMapWholeImpFreqs [x][y][0] = phases [2];
+				   			phaseMapWholeImpFreqs [x][y][1] = phases [3];
+					   	}	
+				   	}
+	   			}else {
+	   				progress.addToBar(0.25);
+	   			}
 				
 		   	/******************************************************************
 			*** 							Output							***	
@@ -812,6 +855,7 @@ public void run(String arg) {
 				tp1.append("	max accepted frequency for filtering (Hz)	" + constants.df6US.format(upperLimit));
 				tp1.append("	min accepted frequency for filtering (Hz)	" + constants.df6US.format(lowerLimit));
 				tp1.append("	histogram bin size (Hz)	" + constants.df6US.format(histogramBins));
+				tp1.append("	output complex maps	" + enhancedOutput);
 				
 				if(extractSignalsUsingSD) {
 					tp1.append("	Extract signal regions using local SD filter");
@@ -932,107 +976,106 @@ public void run(String arg) {
 					tp1.append("");
 				}
 				
-
-				appText = "";
-				
-				tp1.append("");
-				tp1.append("Result (for selected ROI)");
-				appText = ("	average freq (Hz)"
-						+ "	median freq (Hz)"
-						+ "	SD of freq (Hz)"
-						+ "	min freq (Hz)"
-						+ "	max freq (Hz)"
-						+ "	lower freq in APS (Hz)"
-						+ "	power of lower freq. in APS (dB)"
-						+ "	higher freq in APS (Hz)"
-						+ "	power of higher freq. in APS (dB)"
-						+ "	COM of APS"
-						+ "	primary freq in APS (Hz)"
-						+ "	power of prim. freq. in APS (dB)");
-				if(removeBackgroundInSpectra) {
-					appText +="	corrected power of prim. freq. in APS (dB)";					
-				}else {
-					appText += "	";
-				}
-				appText +="	secondary freq in APS (Hz)"
-						+ "	power of sec. freq. in APS (dB)";
-				if(removeBackgroundInSpectra) {
-					appText +="	corrected power of sec. freq. in APS (dB)"
-							+ "	corr. sharpness of prim. freq. in APS (dB)"
-							+ "	corr. sharpness of sec. freq. in APS (dB)";
-				}		else {
-					appText += "			";
-				}		
-				tp1.append(appText);
-				
-				if(assembledPowerSpectrumFromRoi != null){
-					appText = "	" + constants.df6US.format(roiAverage)
-					+ "	" + constants.df6US.format(roiMedian)
-					+ "	" + constants.df6US.format(roiSD)
-					+ "	" + constants.df6US.format(roiMin)
-					+ "	" + constants.df6US.format(roiMax);
-					if(roiFreqs [0] < roiFreqs [1]){
-						appText += "	"; if(roiFreqs[0]!=-1)	appText += constants.df6US.format(roiFreqs [0] * sampleRate / assembledPowerSpectrumFromRoi.length);
-						appText += "	"; if(roiFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(roiAmpl [0])*10);
-						appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(roiFreqs [1] * sampleRate / assembledPowerSpectrumFromRoi.length);
-						appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiAmpl [1])*10);
-						appText += "	"; appText += constants.df6US.format(roiCom * sampleRate / assembledPowerSpectrumFromRoi.length);
-		
-					}else{
-						appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(roiFreqs [1] * sampleRate / assembledPowerSpectrumFromRoi.length);
-						appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiAmpl [1])*10);
-						appText += "	"; if(roiFreqs[0]!=-1)	appText += constants.df6US.format(roiFreqs [0] * sampleRate / assembledPowerSpectrumFromRoi.length);
-						appText += "	"; if(roiFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(roiAmpl [0])*10);
-						appText += "	"; appText += constants.df6US.format(roiCom * sampleRate / assembledPowerSpectrumFromRoi.length);			
-					}
-					appText += "	"; if(roiFreqs[0]!=-1)	appText += constants.df6US.format(roiFreqs [0] * sampleRate / assembledPowerSpectrumFromRoi.length);
-					appText += "	"; if(roiFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(roiAmpl [0])*10);
+				if(manualROI) {
+					tp1.append("");
+					tp1.append("Result (for selected ROI)");
+					appText = ("	average freq (Hz)"
+							+ "	median freq (Hz)"
+							+ "	SD of freq (Hz)"
+							+ "	min freq (Hz)"
+							+ "	max freq (Hz)"
+							+ "	lower freq in APS (Hz)"
+							+ "	power of lower freq. in APS (dB)"
+							+ "	higher freq in APS (Hz)"
+							+ "	power of higher freq. in APS (dB)"
+							+ "	COM of APS"
+							+ "	primary freq in APS (Hz)"
+							+ "	power of prim. freq. in APS (dB)");
 					if(removeBackgroundInSpectra) {
-						appText += "	"; if(roiFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(roiCorrAmpl [0])*10);
+						appText +="	corrected power of prim. freq. in APS (dB)";					
 					}else {
 						appText += "	";
 					}
-					appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(roiFreqs [1] * sampleRate / assembledPowerSpectrumFromRoi.length);
-					appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiAmpl [1])*10);
+					appText +="	secondary freq in APS (Hz)"
+							+ "	power of sec. freq. in APS (dB)";
 					if(removeBackgroundInSpectra) {
-						appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiCorrAmpl [1])*10);
-						appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiCorrSharp [0])*10);
-						appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiCorrSharp [1])*10);						
-					}else {
+						appText +="	corrected power of sec. freq. in APS (dB)"
+								+ "	corr. sharpness of prim. freq. in APS (dB)"
+								+ "	corr. sharpness of sec. freq. in APS (dB)";
+					}		else {
 						appText += "			";
-					}
-				}		
-				tp1.append(appText);
-				tp3.append(name[task] + appText);
-				
-				tp1.append("");
-				tp1.append("	Assembled power spectrum (APC) in Roi");
-				if(assembledPowerSpectrumFromRoi != null){
-					appText = "frequency (Hz)";
-					for(int i = 0; i < assembledPowerSpectrumFromWholeImp.length; i++){
-						appText += "	" + constants.df6US.format((double)i * sampleRate / (double) assembledPowerSpectrumFromRoi.length);
-				 	}
+					}		
 					tp1.append(appText);
-					appText = "raw power (dB)";
-					for(int i = 0; i < assembledPowerSpectrumFromWholeImp.length; i++){
-						appText += "	";	if(assembledPowerSpectrumFromRoi[i]!=0.0)	appText += constants.df6US.format(Math.log10(assembledPowerSpectrumFromRoi[i])*10);
-				 	}
+					
+					if(!assembledPowerSpectrumFromRoi.equals(null) && assembledPowerSpectrumFromRoi.length != 0){
+						appText = "	" + constants.df6US.format(roiAverage)
+						+ "	" + constants.df6US.format(roiMedian)
+						+ "	" + constants.df6US.format(roiSD)
+						+ "	" + constants.df6US.format(roiMin)
+						+ "	" + constants.df6US.format(roiMax);
+						if(roiFreqs [0] < roiFreqs [1]){
+							appText += "	"; if(roiFreqs[0]!=-1)	appText += constants.df6US.format(roiFreqs [0] * sampleRate / assembledPowerSpectrumFromRoi.length);
+							appText += "	"; if(roiFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(roiAmpl [0])*10);
+							appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(roiFreqs [1] * sampleRate / assembledPowerSpectrumFromRoi.length);
+							appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiAmpl [1])*10);
+							appText += "	"; appText += constants.df6US.format(roiCom * sampleRate / assembledPowerSpectrumFromRoi.length);
+			
+						}else{
+							appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(roiFreqs [1] * sampleRate / assembledPowerSpectrumFromRoi.length);
+							appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiAmpl [1])*10);
+							appText += "	"; if(roiFreqs[0]!=-1)	appText += constants.df6US.format(roiFreqs [0] * sampleRate / assembledPowerSpectrumFromRoi.length);
+							appText += "	"; if(roiFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(roiAmpl [0])*10);
+							appText += "	"; appText += constants.df6US.format(roiCom * sampleRate / assembledPowerSpectrumFromRoi.length);			
+						}
+						appText += "	"; if(roiFreqs[0]!=-1)	appText += constants.df6US.format(roiFreqs [0] * sampleRate / assembledPowerSpectrumFromRoi.length);
+						appText += "	"; if(roiFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(roiAmpl [0])*10);
+						if(removeBackgroundInSpectra) {
+							appText += "	"; if(roiFreqs[0]!=-1)	appText += constants.df6US.format(Math.log10(roiCorrAmpl [0])*10);
+						}else {
+							appText += "	";
+						}
+						appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(roiFreqs [1] * sampleRate / assembledPowerSpectrumFromRoi.length);
+						appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiAmpl [1])*10);
+						if(removeBackgroundInSpectra) {
+							appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiCorrAmpl [1])*10);
+							appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiCorrSharp [0])*10);
+							appText += "	"; if(roiFreqs[1]!=-1)	appText += constants.df6US.format(Math.log10(roiCorrSharp [1])*10);						
+						}else {
+							appText += "			";
+						}
+					}		
 					tp1.append(appText);
-					if(removeBackgroundInSpectra) {
-						appText = "corrected power (dB)";
-						for(int i = 0; i < assembledPowerSpectrumFromWholeImp.length; i++){
-							appText += "	";	if(assembledPowerSpectrumFromRoiCorr[i]!=0.0)	appText += constants.df6US.format(Math.log10(assembledPowerSpectrumFromRoiCorr[i])*10);
+					tp3.append(name[task] + appText);
+					
+					tp1.append("");
+					tp1.append("	Assembled power spectrum (APC) in Roi");
+					if(assembledPowerSpectrumFromRoi != null){
+						appText = "frequency (Hz)";
+						for(int i = 0; i < assembledPowerSpectrumFromRoi.length; i++){
+							appText += "	" + constants.df6US.format((double)i * sampleRate / (double) assembledPowerSpectrumFromRoi.length);
 					 	}
 						tp1.append(appText);
-					}else {
+						appText = "raw power (dB)";
+						for(int i = 0; i < assembledPowerSpectrumFromRoi.length; i++){
+							appText += "	";	if(assembledPowerSpectrumFromRoi[i]!=0.0)	appText += constants.df6US.format(Math.log10(assembledPowerSpectrumFromRoi[i])*10);
+					 	}
+						tp1.append(appText);
+						if(removeBackgroundInSpectra) {
+							appText = "corrected power (dB)";
+							for(int i = 0; i < assembledPowerSpectrumFromRoiCorr.length; i++){
+								appText += "	";	if(assembledPowerSpectrumFromRoiCorr[i]!=0.0)	appText += constants.df6US.format(Math.log10(assembledPowerSpectrumFromRoiCorr[i])*10);
+						 	}
+							tp1.append(appText);
+						}else {
+							tp1.append("");
+						}					
+					}else{
 						tp1.append("");
-					}					
-				}else{
-					tp1.append("");
-					tp1.append("");
-					tp1.append("");
+						tp1.append("");
+						tp1.append("");
+					}							
 				}
-								
+						
 				/**
 				 * No longer add detailed results to main file from v0.3.0
 				 * */
@@ -1074,107 +1117,141 @@ public void run(String arg) {
 				addFooter(tp1, currentDate);				
 				tp1.saveAs(filePrefix + ".txt");
 				tp2.saveAs(filePrefix + "_1w.txt");
-				tp3.saveAs(filePrefix + "_1r.txt");
+				if(manualROI) {
+					tp3.saveAs(filePrefix + "_1r.txt");
+				}
 	//			IJ.saveAsTiff(imp, filePrefix + ".tif");
 				
-				save2DPlot(rawFreqRes, 0,0, "1st freq (Hz)", filePrefix + "_f1", true, 0.0, sampleRate / 2.0, "Jet");
-				save2DPlot(rawFreqRes, 2,2, "2nd freq (Hz)", filePrefix + "_f2", true, 0.0, sampleRate / 2.0, "Jet");
-				save2DPlot(rawFreqRes, 1,1, "power 1", filePrefix + "_f1p", true, 0.0, Double.POSITIVE_INFINITY, "Jet");
-				save2DPlot(rawFreqRes, 3,3, "power 2", filePrefix + "_f2p", true, 0.0, Double.POSITIVE_INFINITY, "Jet");
-				save2DPlot(rawFreqRes, 4,4, "com freq (Hz)", filePrefix + "_com", true, 0.0, sampleRate / 4.0, "Jet");
-				save2DPlot(rawFreqRes, 5,0, "phase of 1st freq (rad)", filePrefix + "_ph1", true, -Math.PI, Math.PI, "Spectrum");
-				save2DPlot(rawFreqRes, 6,2, "phase of 2nd freq (rad)", filePrefix + "_ph2",true, -Math.PI, Math.PI, "Spectrum");
-	//			save2DPlot(evMapRaw, "eigenvec ph1 (rad)", filePrefix + "_ev1", true, -Math.PI, Math.PI, "Spectrum");
-				if(removeBackgroundInSpectra) {
-					saveBooleanAsPlot(signal, "signal region", filePrefix + "_signal");
+				
+				/**
+				 * Generate output maps
+				 * */
+				{
+					save2DPlot(rawFreqRes, 0,0, "1st freq (Hz)", filePrefix + "_f1", true, lowerLimit, upperLimit, "Jet");
+					save2DPlot(rawFreqRes, 2,2, "2nd freq (Hz)", filePrefix + "_f2", true, lowerLimit, upperLimit, "Jet");
+					save2DPlot(rawFreqRes, 1,1, "power 1", filePrefix + "_f1p", true, 0.0, Double.POSITIVE_INFINITY, "Jet");
+					save2DPlot(rawFreqRes, 3,3, "power 2", filePrefix + "_f2p", true, 0.0, Double.POSITIVE_INFINITY, "Jet");
+					if(enhancedOutput) {
+						save2DPlot(rawFreqRes, 4,4, "com freq (Hz)", filePrefix + "_com", true, lowerLimit, upperLimit, "Jet");
+						save2DPlot(rawFreqRes, 5,0, "phase of 1st freq (rad)", filePrefix + "_ph1", true, -Math.PI, Math.PI, "Spectrum");
+						save2DPlot(rawFreqRes, 6,2, "phase of 2nd freq (rad)", filePrefix + "_ph2",true, -Math.PI, Math.PI, "Spectrum");
+		//				save2DPlot(evMapRaw, "eigenvec ph1 (rad)", filePrefix + "_ev1", true, -Math.PI, Math.PI, "Spectrum");
+					}
+					if(removeBackgroundInSpectra) {
+						saveBooleanAsPlot(signal, "signal region", filePrefix + "_signal");
+					}
+					save2DPlot(corrFreqRes, 0,0, "1st freq (Hz)", filePrefix + "_f1_c", true, lowerLimit, upperLimit, "Jet");
+					save2DPlot(corrFreqRes, 2,2, "2nd freq (Hz)", filePrefix + "_f2_c", true, lowerLimit, upperLimit, "Jet");
+					save2DPlot(corrFreqRes, 1,1, "power 1", filePrefix + "_f1p_c", true, 0.0, Double.POSITIVE_INFINITY, "Jet");
+					save2DPlot(corrFreqRes, 3,3, "power 2", filePrefix + "_f2p_c", true, 0.0, Double.POSITIVE_INFINITY, "Jet");
+					if(enhancedOutput) {
+						save2DPlot(corrFreqRes, 4,4, "com freq (Hz)", filePrefix + "_com_c", true, lowerLimit, upperLimit, "Jet");
+						save2DPlot(corrFreqRes, 5,0, "phase of 1st freq (rad)", filePrefix + "_ph1_c", true, -Math.PI, Math.PI, "Spectrum");
+						save2DPlot(corrFreqRes, 6,2, "phase of 2nd freq (rad)", filePrefix + "_ph2_c",true, -Math.PI, Math.PI, "Spectrum");
+					}
+		//			save2DPlot(evMapCorr, "eigenvec ph1 (rad)", filePrefix + "_ev1_c", true, -Math.PI, Math.PI, "Spectrum");
+					saveBooleanAsPlot(signalPostCorr, "signal region (corr)", filePrefix + "_signal_c");
+					
+					if(enhancedOutput) {
+						if(manualROI) {
+							save2DPlotMasked(phaseMapRoiFreqs,corrFreqRes, 0,0, "phase at " + locFreqs [0] + " Hz (rad)", filePrefix + "_ph_freq1_r", -Math.PI, Math.PI, "Spectrum");
+							save2DPlotMasked(phaseMapRoiFreqs,corrFreqRes, 1,2, "phase at " + locFreqs [1] + " Hz (rad)", filePrefix + "_ph_freq2_r", -Math.PI, Math.PI, "Spectrum");
+						}
+						save2DPlotMasked(phaseMapWholeImpFreqs,corrFreqRes, 0,0, "phase at " + locFreqs [2] + " Hz (rad)", filePrefix + "_ph_freq1_w", -Math.PI, Math.PI, "Spectrum");
+						save2DPlotMasked(phaseMapWholeImpFreqs,corrFreqRes, 1,2, "phase at " + locFreqs [3] + " Hz (rad)", filePrefix + "_ph_freq2_w", -Math.PI, Math.PI, "Spectrum");
+					}
+					
+					//save these plots also as text files
+					save2DPlotAsText(rawFreqRes, 0,0, "1st freq (Hz)", filePrefix + "_f1", true, 0.0, sampleRate / 2.0, currentDate);
+					save2DPlotAsText(rawFreqRes, 2,2, "2nd freq (Hz)", filePrefix + "_f2", true, 0.0, sampleRate / 2.0, currentDate);
+					save2DPlotAsText(rawFreqRes, 1,1, "power 1", filePrefix + "_f1p", true, 0.0, Double.POSITIVE_INFINITY, currentDate);
+					save2DPlotAsText(rawFreqRes, 3,3, "power 2", filePrefix + "_f2p", true, 0.0, Double.POSITIVE_INFINITY, currentDate);
+					if(enhancedOutput) {
+						save2DPlotAsText(rawFreqRes, 4,4, "com freq (Hz)", filePrefix + "_com", true, 0.0, sampleRate / 4.0, currentDate);
+						save2DPlotAsText(rawFreqRes, 5,5, "phase of 1st freq (rad)", filePrefix + "_ph1", true, -Math.PI, Math.PI, currentDate);
+						save2DPlotAsText(rawFreqRes, 6,6, "phase of 2nd freq (rad)", filePrefix + "_ph2", true, -Math.PI, Math.PI, currentDate);
+					}
+					
+					save2DPlotAsText(corrFreqRes, 0,0, "1st freq (Hz)", filePrefix + "_f1_c", true, 0.0, sampleRate / 2.0, currentDate);
+					save2DPlotAsText(corrFreqRes, 2,2, "2nd freq (Hz)", filePrefix + "_f2_c", true, 0.0, sampleRate / 2.0, currentDate);
+					save2DPlotAsText(corrFreqRes, 1,1, "power 1", filePrefix + "_f1p_c", true, 0.0, Double.POSITIVE_INFINITY, currentDate);
+					save2DPlotAsText(corrFreqRes, 3,3, "power 2", filePrefix + "_f2p_c", true, 0.0, Double.POSITIVE_INFINITY, currentDate);
+					if(enhancedOutput) {
+						save2DPlotAsText(corrFreqRes, 4,4, "com freq (Hz)", filePrefix + "_com_c", true, 0.0, sampleRate / 2.0, currentDate);
+						save2DPlotAsText(corrFreqRes, 5,0, "phase of 1st freq (rad)", filePrefix + "_ph1_c", true, -Math.PI, Math.PI, currentDate);
+						save2DPlotAsText(corrFreqRes, 6,2, "phase of 2nd freq (rad)", filePrefix + "_ph2_c",true, -Math.PI, Math.PI, currentDate);
+					}
+					
+					if(enhancedOutput) {
+						if(manualROI) {
+							save2DPlotAsTextMasked(phaseMapRoiFreqs,corrFreqRes, 0,0, "phase at " + locFreqs [0] + " Hz (rad)", filePrefix + "_ph_freq1_r", -Math.PI, Math.PI, currentDate);
+							save2DPlotAsTextMasked(phaseMapRoiFreqs,corrFreqRes, 1,2, "phase at " + locFreqs [1] + " Hz (rad)", filePrefix + "_ph_freq2_r", -Math.PI, Math.PI, currentDate);
+						}
+					save2DPlotAsTextMasked(phaseMapWholeImpFreqs,corrFreqRes, 0,0, "phase at " + locFreqs [2] + " Hz (rad)", filePrefix + "_ph_freq1_w", -Math.PI, Math.PI, currentDate);
+					save2DPlotAsTextMasked(phaseMapWholeImpFreqs,corrFreqRes, 1,2, "phase at " + locFreqs [3] + " Hz (rad)", filePrefix + "_ph_freq2_w", -Math.PI, Math.PI, currentDate);
+					}
 				}
-				save2DPlot(corrFreqRes, 0,0, "1st freq (Hz)", filePrefix + "_f1_c", true, lowerLimit, upperLimit, "Jet");
-				save2DPlot(corrFreqRes, 2,2, "2nd freq (Hz)", filePrefix + "_f2_c", true, lowerLimit, upperLimit, "Jet");
-				save2DPlot(corrFreqRes, 1,1, "power 1", filePrefix + "_f1p_c", true, 0.0, Double.POSITIVE_INFINITY, "Jet");
-				save2DPlot(corrFreqRes, 3,3, "power 2", filePrefix + "_f2p_c", true, 0.0, Double.POSITIVE_INFINITY, "Jet");
-				save2DPlot(corrFreqRes, 4,4, "com freq (Hz)", filePrefix + "_com_c", true, lowerLimit, upperLimit, "Jet");
-				save2DPlot(corrFreqRes, 5,0, "phase of 1st freq (rad)", filePrefix + "_ph1_c", true, -Math.PI, Math.PI, "Spectrum");
-				save2DPlot(corrFreqRes, 6,2, "phase of 2nd freq (rad)", filePrefix + "_ph2_c",true, -Math.PI, Math.PI, "Spectrum");
-	//			save2DPlot(evMapCorr, "eigenvec ph1 (rad)", filePrefix + "_ev1_c", true, -Math.PI, Math.PI, "Spectrum");
-				saveBooleanAsPlot(signalPostCorr, "signal region (corr)", filePrefix + "_signal_c");
 				
-				save2DPlotMasked(phaseMapRoiFreqs,corrFreqRes, 0,0, "phase at " + locFreqs [0] + " Hz (rad)", filePrefix + "_ph_freq1_r", -Math.PI, Math.PI, "Spectrum");
-				save2DPlotMasked(phaseMapRoiFreqs,corrFreqRes, 1,2, "phase at " + locFreqs [1] + " Hz (rad)", filePrefix + "_ph_freq2_r", -Math.PI, Math.PI, "Spectrum");
-				save2DPlotMasked(phaseMapWholeImpFreqs,corrFreqRes, 0,0, "phase at " + locFreqs [2] + " Hz (rad)", filePrefix + "_ph_freq1_w", -Math.PI, Math.PI, "Spectrum");
-				save2DPlotMasked(phaseMapWholeImpFreqs,corrFreqRes, 1,2, "phase at " + locFreqs [3] + " Hz (rad)", filePrefix + "_ph_freq2_w", -Math.PI, Math.PI, "Spectrum");
+				/**
+				 * Plot power spectra
+				 * */
+				xValues = new double [(int)(assembledPowerSpectrumFromWholeImp.length/2.0)];
+				yValues = new double [1][(int)(assembledPowerSpectrumFromWholeImp.length/2.0)];
+				for(int i = 0; i < xValues.length; i++){
+					xValues [i] = (double)i * sampleRate / (double) assembledPowerSpectrumFromWholeImp.length;
+				}
 				
-				//save these plots also as text files
-				save2DPlotAsText(rawFreqRes, 0,0, "1st freq (Hz)", filePrefix + "_f1", true, 0.0, sampleRate / 2.0, currentDate);
-				save2DPlotAsText(rawFreqRes, 2,2, "2nd freq (Hz)", filePrefix + "_f2", true, 0.0, sampleRate / 2.0, currentDate);
-				save2DPlotAsText(rawFreqRes, 1,1, "power 1", filePrefix + "_f1p", true, 0.0, Double.POSITIVE_INFINITY, currentDate);
-				save2DPlotAsText(rawFreqRes, 3,3, "power 2", filePrefix + "_f2p", true, 0.0, Double.POSITIVE_INFINITY, currentDate);
-				save2DPlotAsText(rawFreqRes, 4,4, "com freq (Hz)", filePrefix + "_com", true, 0.0, sampleRate / 4.0, currentDate);
-				save2DPlotAsText(rawFreqRes, 5,5, "phase of 1st freq (rad)", filePrefix + "_ph1", true, -Math.PI, Math.PI, currentDate);
-				save2DPlotAsText(rawFreqRes, 6,6, "phase of 2nd freq (rad)", filePrefix + "_ph2", true, -Math.PI, Math.PI, currentDate);
-				
-				save2DPlotAsText(corrFreqRes, 0,0, "1st freq (Hz)", filePrefix + "_f1_c", true, lowerLimit, upperLimit, currentDate);
-				save2DPlotAsText(corrFreqRes, 2,2, "2nd freq (Hz)", filePrefix + "_f2_c", true, lowerLimit, upperLimit, currentDate);
-				save2DPlotAsText(corrFreqRes, 1,1, "power 1", filePrefix + "_f1p_c", true, 0.0, Double.POSITIVE_INFINITY, currentDate);
-				save2DPlotAsText(corrFreqRes, 3,3, "power 2", filePrefix + "_f2p_c", true, 0.0, Double.POSITIVE_INFINITY, currentDate);
-				save2DPlotAsText(corrFreqRes, 4,4, "com freq (Hz)", filePrefix + "_com_c", true, lowerLimit, upperLimit, currentDate);
-				save2DPlotAsText(corrFreqRes, 5,0, "phase of 1st freq (rad)", filePrefix + "_ph1_c", true, -Math.PI, Math.PI, currentDate);
-				save2DPlotAsText(corrFreqRes, 6,2, "phase of 2nd freq (rad)", filePrefix + "_ph2_c",true, -Math.PI, Math.PI, currentDate);
-				
-				save2DPlotAsTextMasked(phaseMapRoiFreqs,corrFreqRes, 0,0, "phase at " + locFreqs [0] + " Hz (rad)", filePrefix + "_ph_freq1_r", -Math.PI, Math.PI, currentDate);
-				save2DPlotAsTextMasked(phaseMapRoiFreqs,corrFreqRes, 1,2, "phase at " + locFreqs [1] + " Hz (rad)", filePrefix + "_ph_freq2_r", -Math.PI, Math.PI, currentDate);
-				save2DPlotAsTextMasked(phaseMapWholeImpFreqs,corrFreqRes, 0,0, "phase at " + locFreqs [2] + " Hz (rad)", filePrefix + "_ph_freq1_w", -Math.PI, Math.PI, currentDate);
-				save2DPlotAsTextMasked(phaseMapWholeImpFreqs,corrFreqRes, 1,2, "phase at " + locFreqs [3] + " Hz (rad)", filePrefix + "_ph_freq2_w", -Math.PI, Math.PI, currentDate);
-				
-				//plot power spectras
-				xValues = new double [(int)(sampleRate/2.0)];
-				yValues = new double [1][(int)(sampleRate/2.0)];
 				if(removeBackgroundInSpectra) {
-					for(int i = 0; i < (int)(sampleRate/2.0); i++){
-						xValues [i] = (double)i * sampleRate / (double) powerSpectrumBackground[0].length;
-						yValues [0][i] = powerSpectrumBackground[0][i];
+					for(int i = 0; i < xValues.length; i++){
+						yValues [0][i] = Math.log10(powerSpectrumBackground[0][i])*10;
 					}
-					plot2DArray(xValues, yValues, "Power Spectra Background (Mean)", "frequency (Hz)", "power", filePrefix + "_bg_avg", true, new String[]{""});
+					plot2DArray(xValues, yValues, "Power Spectra Background (Mean)", "frequency (Hz)", "mean background power (dB)", filePrefix + "_bg_avg", true, new String[]{""});
 						
-					for(int i = 0; i < (int)(sampleRate/2.0); i++){
-						yValues [0][i] = powerSpectrumBackground[1][i];
+					for(int i = 0; i < xValues.length; i++){
+						yValues [0][i] = Math.log10(powerSpectrumBackground[1][i])*10;
 					}
-					plot2DArray(xValues, yValues, "Power Spectra Background (SD)", "frequency (Hz)", "power", filePrefix + "_bg_sd", true, new String[]{""});
+					plot2DArray(xValues, yValues, "Power Spectra Background (SD)", "frequency (Hz)", "SD of background power (dB)", filePrefix + "_bg_sd", true, new String[]{""});
 				}
 				
 				if(assembledPowerSpectrumFromWholeImp != null){
-					for(int i = 0; i < (int)(sampleRate/2.0); i++){
-						yValues [0][i] = assembledPowerSpectrumFromWholeImp[i];
+					for(int i = 0; i < xValues.length; i++){
+						if(assembledPowerSpectrumFromWholeImp[i] != 0.0) {
+							yValues [0][i] = Math.log10(assembledPowerSpectrumFromWholeImp[i])*10;
+						}else {
+							yValues [0][i] = 0.0;
+						}
 				 	}
-					plot2DArray(xValues, yValues, "Power Spectrum - entire image", "frequency (Hz)", "power", filePrefix + "_psw", true, new String[]{""});
+					plot2DArray(xValues, yValues, "Power Spectrum - entire image", "frequency (Hz)", "power (dB)", filePrefix + "_psw", true, new String[]{""});
 					
 					if(removeBackgroundInSpectra) {						
-						for(int i = 0; i < (int)(sampleRate/2.0); i++){
-							yValues [0][i] = assembledPowerSpectrumFromWholeImpCorr[i];
+						for(int i = 0; i < xValues.length; i++){
+							yValues [0][i] = Math.log10(assembledPowerSpectrumFromWholeImpCorr[i])*10;
 					 	}
-						plot2DArray(xValues, yValues, "Power Spectrum - entire image", "frequency (Hz)", "power", filePrefix + "_psw_c", true, new String[]{""});
+						plot2DArray(xValues, yValues, "Power Spectrum - entire image", "frequency (Hz)", "corrected power (dB)", filePrefix + "_psw_c", true, new String[]{""});
 					}
 				}			
 				
-				if(assembledPowerSpectrumFromRoi != null){
-					//TODO show only from certain value on!!!
-					for(int i = 0; i < (int)(sampleRate/2.0); i++){
-						yValues [0][i] = assembledPowerSpectrumFromRoi[i];
+				if(manualROI & !assembledPowerSpectrumFromRoi.equals(null)){
+					for(int i = 0; i < xValues.length; i++){
+						yValues [0][i] = Math.log10(assembledPowerSpectrumFromRoi[i])*10;
 				 	}
-					plot2DArray(xValues, yValues, "Power Spectrum - entire roi", "frequency (Hz)", "power", filePrefix + "_psr", true, new String[]{""});	
+					plot2DArray(xValues, yValues, "Power Spectrum - entire roi", "frequency (Hz)", "power (dB)", filePrefix + "_psr", true, new String[]{""});	
 					
 					if(removeBackgroundInSpectra) {						
-						for(int i = 0; i < (int)(sampleRate/2.0); i++){
-							yValues [0][i] = assembledPowerSpectrumFromRoiCorr[i];
+						for(int i = 0; i < xValues.length; i++){
+							yValues [0][i] = Math.log10(assembledPowerSpectrumFromRoiCorr[i])*10;
 					 	}
-						plot2DArray(xValues, yValues, "Power Spectrum - entire roi", "frequency (Hz)", "power", filePrefix + "_psr_c", true, new String[]{""});
+						plot2DArray(xValues, yValues, "Power Spectrum - entire roi", "frequency (Hz)", "corrected power (dB)", filePrefix + "_psr_c", true, new String[]{""});
 					}
 				}
 				
 				re = new RoiEncoder(filePrefix + "_roi");
-				try {
-					re.write(selections [task]);
-				} catch (IOException e) {
-					IJ.error("ROI Manager", e.getMessage());
+				if(manualROI) {
+					try {
+						re.write(selections [task]);
+					} catch (IOException e) {
+						IJ.error("ROI Manager", e.getMessage());
+					}
 				}
 			
 			/******************************************************************
@@ -1327,26 +1404,24 @@ private static double [] getFrequenciesWithPower (double [] values, double sampl
     	magnitude [j] = Math.sqrt(real*real+imaginary*imaginary) / magnitude.length;
     }
     
-    //TODO smooth magnitude
+    //Smooth magnitude
     magnitude = smooth(magnitude, smoothWindowSize);
     
     //display as plot
     if(showPlot)	tools.showAsPlot(magnitude);
     
-    //output maximum frequencies and respective powers (from index 2 on)	//TODO
-//  int [] freqs = tools.get2HighestMaximaIndicesWithinRange(magnitude, (int)Math.round(2*(magnitude.length/sampleRate)), (magnitude.length/2));
     int [] freqs = tools.get2HighestMaximaIndicesWithinRange(magnitude,
     		(int)Math.round(lowerLimit*(magnitude.length/sampleRate)), 
 		(int)Math.round(upperLimit*(magnitude.length/sampleRate)));
     double [] ampl = new double [2];
     double com = tools.getCenterOfMassOfRange(magnitude, 0, (magnitude.length/2)-1);
     if(freqs[0] >= 0 && freqs [0] < magnitude.length){
-    	ampl [0] = magnitude [freqs[0]];
+    	ampl [0] = magnitude [freqs[0]] * 2.0;
     }else{
     	ampl [0] = 0.0;
     }
     if(freqs[1] >= 0 && freqs [1] < magnitude.length){
-    	ampl [1] = magnitude [freqs[1]];
+    	ampl [1] = magnitude [freqs[1]] * 2.0;
     }else{
     	ampl [1] = 0.0;
     }
@@ -1392,14 +1467,12 @@ private static double [] getFrequenciesWithPowerAndPhase (double [] values, doub
     	magnitude [j] = Math.sqrt(real*real+imaginary*imaginary) / magnitude.length;
     }
     
-    //TODO smooth magnitude
+    //Smooth magnitude
     magnitude = smooth(magnitude, smoothWindowSize);
     
     //display as plot
     if(showPlot)	tools.showAsPlot(magnitude);
     
-    //output maximum frequencies and respective powers (from index 2 on)	//TODO
-//  int [] freqs = tools.get2HighestMaximaIndicesWithinRange(magnitude, (int)Math.round(2*(magnitude.length/sampleRate)), (magnitude.length/2));
     int [] freqs = tools.get2HighestMaximaIndicesWithinRange(magnitude,
     		(int)Math.round(lowerLimit*(magnitude.length/sampleRate)), 
 		(int)Math.round(upperLimit*(magnitude.length/sampleRate)));
@@ -1407,13 +1480,13 @@ private static double [] getFrequenciesWithPowerAndPhase (double [] values, doub
     double [] phases = new double [2];
     double com = tools.getCenterOfMassOfRange(magnitude, 0, (magnitude.length/2)-1);
     if(freqs[0] >= 0 && freqs [0] < magnitude.length){
-    	ampl [0] = magnitude [freqs[0]];
+    	ampl [0] = magnitude [freqs[0]] * 2.0;
     	phases [0] = phase[freqs[0]];
     }else{
     	ampl [0] = 0.0;
     }
     if(freqs[1] >= 0 && freqs [1] < magnitude.length){
-    	ampl [1] = magnitude [freqs[1]];
+    	ampl [1] = magnitude [freqs[1]] * 2.0;
     	phases [1] = phase[freqs[1]];
     }else{
     	ampl [1] = 0.0;
@@ -1450,7 +1523,7 @@ public static double [] getFrequencySpectrum (double [] values, boolean showPlot
     for(int j = 0; j < values.length; j++){
     	real = fft[2*j];
     	imaginary = fft[2*j+1];
-    	magnitude [j] = Math.sqrt(real*real+imaginary*imaginary) / magnitude.length;
+    	magnitude [j] = Math.sqrt(real*real+imaginary*imaginary) / magnitude.length * 2.0;
     }
     magnitude = smooth(magnitude, smoothWindowSize);
     
@@ -1504,20 +1577,18 @@ public static double [] getSignificantFrequenciesWithPowers (double [] values, d
     //display as plot
     if(showPlot)	tools.showAsPlot(magnitude);
     
-    //output maximum frequencies and respective powers (from index 2 on)	//TODO
-//    int [] freqs = tools.get2HighestMaximaIndicesWithinRange(magnitude, (int)Math.round(2*(magnitude.length/sampleRate)), (magnitude.length/2));
     int [] freqs = tools.get2HighestMaximaIndicesWithinRange(magnitude,
     		(int)Math.round(lowerLimit*(magnitude.length/sampleRate)), 
 		(int)Math.round(upperLimit*(magnitude.length/sampleRate)));
     double [] ampl = new double [2];
     double com = tools.getCenterOfMassOfRange(magnitude, 0, (magnitude.length/2)-1);
     if(freqs[0] >= 0 && freqs [0] < magnitude.length){
-    	ampl [0] = magnitude [freqs[0]] + powerSpectrumBackground [0][freqs[0]] + SDLimit * powerSpectrumBackground [1][freqs[0]];
+    	ampl [0] = 2.0 * (magnitude [freqs[0]] + powerSpectrumBackground [0][freqs[0]] + SDLimit * powerSpectrumBackground [1][freqs[0]]);
     }else{
     	ampl [0] = 0.0;
     }
     if(freqs[1] >= 0 && freqs [1] < magnitude.length){
-    	ampl [1] = magnitude [freqs[1]] + powerSpectrumBackground [0][freqs[1]] + SDLimit * powerSpectrumBackground [1][freqs[1]];
+    	ampl [1] = 2.0 * (magnitude [freqs[1]] + powerSpectrumBackground [0][freqs[1]] + SDLimit * powerSpectrumBackground [1][freqs[1]]);
     }else{
     	ampl [1] = 0.0;
     }
@@ -1579,8 +1650,6 @@ public static double [] getSignificantFrequenciesWithPowersAndPhases (double [] 
     //display as plot
     if(showPlot)	tools.showAsPlot(magnitude);
     
-    //output maximum frequencies and respective powers (from index 2 on)	//TODO
-//    int [] freqs = tools.get2HighestMaximaIndicesWithinRange(magnitude, (int)Math.round(2*(magnitude.length/sampleRate)), (magnitude.length/2));
     int [] freqs = tools.get2HighestMaximaIndicesWithinRange(magnitude,
     		(int)Math.round(lowerLimit*(magnitude.length/sampleRate)), 
 		(int)Math.round(upperLimit*(magnitude.length/sampleRate)));
@@ -1588,13 +1657,13 @@ public static double [] getSignificantFrequenciesWithPowersAndPhases (double [] 
     double [] phases = new double [2];
     double com = tools.getCenterOfMassOfRange(magnitude, 0, (magnitude.length/2)-1);
     if(freqs[0] >= 0 && freqs [0] < magnitude.length){
-    	ampl [0] = magnitude [freqs[0]] + powerSpectrumBackground [0][freqs[0]] + SDLimit * powerSpectrumBackground [1][freqs[0]];
+    	ampl [0] = 2.0 * (magnitude [freqs[0]] + powerSpectrumBackground [0][freqs[0]] + SDLimit * powerSpectrumBackground [1][freqs[0]]);
     	phases [0] = phase[freqs[0]];
     }else{
     	ampl [0] = 0.0;
     }
     if(freqs[1] >= 0 && freqs [1] < magnitude.length){
-    	ampl [1] = magnitude [freqs[1]] + powerSpectrumBackground [0][freqs[1]] + SDLimit * powerSpectrumBackground [1][freqs[1]];
+    	ampl [1] = 2.0 * (magnitude [freqs[1]] + powerSpectrumBackground [0][freqs[1]] + SDLimit * powerSpectrumBackground [1][freqs[1]]);
     	phases [1] = phase[freqs[1]];
     }else{
     	ampl [1] = 0.0;
@@ -1701,20 +1770,18 @@ public static double [] getAboveMinimumFrequenciesWithPowers (double [] values, 
     //display as plot
     if(showPlot)	tools.showAsPlot(magnitude);
     
-    //output maximum frequencies and respective powers (from index 2 on)	//TODO
-//    int [] freqs = tools.get2HighestMaximaIndicesWithinRange(magnitude, (int)Math.round(2*(magnitude.length/sampleRate)), (magnitude.length/2));
     int [] freqs = tools.get2HighestMaximaIndicesWithinRange(magnitude,
     		(int)Math.round(lowerLimit*(magnitude.length/sampleRate)), 
 		(int)Math.round(upperLimit*(magnitude.length/sampleRate)));
     double [] ampl = new double [2];
     double com = tools.getCenterOfMassOfRange(magnitude, 0, (magnitude.length/2)-1);
     if(freqs[0] >= 0 && freqs [0] < magnitude.length){
-    	ampl [0] = magnitude [freqs[0]] + powerSpectrumMinima [freqs[0]];
+    	ampl [0] = 2.0 * (magnitude [freqs[0]] + powerSpectrumMinima [freqs[0]]);
     }else{
     	ampl [0] = 0.0;
     }
     if(freqs[1] >= 0 && freqs [1] < magnitude.length){
-    	ampl [1] = magnitude [freqs[1]] + powerSpectrumMinima [freqs[1]];
+    	ampl [1] = 2.0 * (magnitude [freqs[1]] + powerSpectrumMinima [freqs[1]]);
     }else{
     	ampl [1] = 0.0;
     }
@@ -2620,6 +2687,48 @@ private static void plot2DArray(double xValues [], double [][] array, String lab
  	System.gc();
 }
 
+/**
+* 1st dimension > different graphs
+* 2nd dimension > y points
+* TODO add array to plot vlines
+* TODO add String array to label vlines and put legend
+* */
+private static void plot2DArrayWithAdditionalLines(double xValues [], double [][] array, String label, String xLabel, String yLabel, String savePath, boolean logarithmic, String legends []){
+	double yMax = Double.NEGATIVE_INFINITY;
+	double max;
+	for(int i = 0; i < array.length; i++){
+		max = tools.getMaximum(array[i]);
+		if(yMax < max) yMax = max;
+	}
+	Color c;
+	Plot p;
+	ImagePlus pImp;
+	String legend = "";
+	PlotWindow.noGridLines = true;
+	
+	p = new Plot(label, xLabel, yLabel);
+	p.setAxisYLog(logarithmic);
+	p.updateImage();
+	p.setSize(600, 400);
+	p.setLimits(0, xValues.length-1, 0.0, yMax);
+	p.updateImage();
+	for(int i = 0; i < array.length; i++){
+		c = new Color(54+(int)(i/(double)array.length*200.0), 54+(int)(i/(double)array.length*200.0), 54+(int)(i/(double)array.length*200.0));
+		p.setColor(c);
+		p.addPoints(xValues,array[i],PlotWindow.LINE);
+		legend += "" + legends [i];
+		legend += "\n";
+	}
+	p.addLegend(legend);
+	p.setLimitsToFit(true);
+	pImp = p.makeHighResolution("plot",1,true,false);
+	IJ.saveAs(pImp,"PNG",savePath + ".png");
+	pImp.changes = false;
+	pImp.close();
+	p.dispose();			
+ 	System.gc();
+}
+
 private static LUT getLUT(double [][] array, boolean multiplyWith255) {
 	byte [] red = new byte [array.length];
 	byte [] green = new byte [array.length];
@@ -2654,6 +2763,9 @@ private static LUT getLUT(double [][] array, boolean multiplyWith255) {
 	}	
 }
 
+/**
+ * TODO
+ * */
 private static double [] getHistogram(double input [], int min, int max, double binSize) {
 	//TODO
 	return new double [] {0.0,0.0};
