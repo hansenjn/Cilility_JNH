@@ -152,6 +152,16 @@ public class tools{
 		return maximum;		
 	}
 	
+	public static double getMinimum(double [] values){
+		double minimum = Double.POSITIVE_INFINITY;
+		for(int i = 0; i < values.length; i++){
+			if(values [i] < minimum){
+				minimum = values [i];
+			}
+		}
+		return minimum;
+	}
+	
 	public static int getMinimumIndex(double [] values){
 		double value = Double.POSITIVE_INFINITY;
 		int index = -1; 
