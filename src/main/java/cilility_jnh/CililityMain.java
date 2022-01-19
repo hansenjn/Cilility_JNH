@@ -2680,6 +2680,11 @@ private static void convertToRGB(ImagePlus imp){
 * */
 private static void plot2DArray(double xValues [], double [][] array, String label, String xLabel, String yLabel, String savePath, boolean logarithmic, String legends []){
 	double yMax = Double.NEGATIVE_INFINITY, yMin = Double.POSITIVE_INFINITY;
+	double xMin = tools.getMinimum(xValues), xMax = tools.getMaximum(xValues);
+	xMin -= Math.abs(xMin*0.05);
+	if(xMin>0.0) xMin = 0.0;
+	xMax += Math.abs(xMax*0.05);
+	
 	double max, min;
 	for(int i = 0; i < array.length; i++){
 		max = tools.getMaximum(array[i]);
@@ -2701,7 +2706,7 @@ private static void plot2DArray(double xValues [], double [][] array, String lab
 	p.setAxisYLog(logarithmic);
 	p.updateImage();
 	p.setSize(600, 400);
-	p.setLimits(0, xValues.length-1, yMin, yMax);
+	p.setLimits(xMin, xMax, yMin, yMax);
 	p.updateImage();
 	for(int i = 0; i < array.length; i++){
 		c = new Color(54+(int)(i/(double)array.length*200.0), 54+(int)(i/(double)array.length*200.0), 54+(int)(i/(double)array.length*200.0));
@@ -2727,6 +2732,11 @@ private static void plot2DArray(double xValues [], double [][] array, String lab
 * */
 private static void plot2DArrayWithAdditionalLines(double xValues [], double [][] array, String label, String xLabel, String yLabel, String savePath, boolean logarithmic, String legends [], double lines [], String lineLabels []){
 	double yMax = Double.NEGATIVE_INFINITY, yMin = Double.POSITIVE_INFINITY;
+	double xMin = tools.getMinimum(xValues), xMax = tools.getMaximum(xValues);
+	xMin -= Math.abs(xMin*0.05);
+	if(xMin>0.0) xMin = 0.0;
+	xMax += Math.abs(xMax*0.05);
+	
 	double max, min;
 	for(int i = 0; i < array.length; i++){
 		max = tools.getMaximum(array[i]);
@@ -2748,7 +2758,7 @@ private static void plot2DArrayWithAdditionalLines(double xValues [], double [][
 	p.setAxisYLog(logarithmic);
 	p.updateImage();
 	p.setSize(600, 400);
-	p.setLimits(0, xValues.length-1, yMin, yMax);
+	p.setLimits(xMin, xMax, yMin, yMax);
 	p.updateImage();
 	for(int i = 0; i < lines.length; i++) {
 		double lineX [] = new double []{lines[i], lines[i]};
