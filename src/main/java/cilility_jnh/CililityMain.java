@@ -170,7 +170,7 @@ public void run(String arg) {
 			InstructionsFont, INSTRCOLOR);
 	
 	gd.setInsets(10,0,0);		gd.addMessage("Output settings", SubHeadingFont);
-	gd.setInsets(0, 5, 0);	gd.addNumericField("Bin size in histograms (Hz)", histogramBins, 2);
+	gd.setInsets(0, 0, 0);	gd.addNumericField("Bin size in histograms (Hz)", histogramBins, 2);
 	gd.setInsets(0, 0, 0);	gd.addCheckbox("Output complex maps (phase, com, ...)", enhancedOutput);
 	gd.setInsets(0,0,0);	gd.addChoice("Output file names ", outputVariant, selectedOutputVariant);
 	gd.showDialog();
@@ -407,6 +407,19 @@ public void run(String arg) {
 			}
 		   	//open Image
 		   	
+		   	// Prepare saving file name
+		   	if(name[task].contains(".")){
+				filePrefix = name[task].substring(0,name[task].lastIndexOf(".")) + "_Cil";
+			}else{
+				filePrefix = name[task] + "_Cil";
+			}
+			
+			if(selectedOutputVariant.equals(outputVariant[1])){
+				//saveDate
+				filePrefix += "_" + NameDateFormatter.format(startDate);
+			}
+			
+			filePrefix = dir[task] + filePrefix;
 			try {   	
 			/******************************************************************
 			*** 						Processing							***	
@@ -555,7 +568,10 @@ public void run(String arg) {
 				   	roiAverage = tools.getAverage(valueColumn);
 				   	roiMedian = tools.getMedian(valueColumn);
 				   	roiSD = tools.getSD(valueColumn);
-				   	//TODO Determine HISTOGRAM histogramBins
+
+
+				   	saveAsHistogram(valueColumn, lowerLimit, upperLimit, histogramBins, false, true, "Frequency Histogram (ROI)",
+				   			"frequency 1 of signal pixels in ROI","Hz", filePrefix + "_f1_hist_r", new Date());
 	   			}else {
 	   				signalPixels = 0;
 	   				for(int x = 0; x < imp.getWidth(); x++){
@@ -599,7 +615,8 @@ public void run(String arg) {
 			   	wholeImpAverage = tools.getAverage(valueColumn);
 			   	wholeImpMedian = tools.getMedian(valueColumn);
 			   	wholeImpSD = tools.getSD(valueColumn);
-			   	//TODO Determin HISTOGRAM histogramBins
+			   	saveAsHistogram(valueColumn, lowerLimit, upperLimit, histogramBins, false, true, "Frequency Histogram",
+			   			"frequency 1 of signal pixels", "Hz", filePrefix + "_f1_hist", new Date());
 			   	
 			   	//DETERMINE POWER SPECTRUM IN ROI
 			   	assembledPowerSpectrumFromRoi = new double [0];
@@ -824,34 +841,20 @@ public void run(String arg) {
 			*** 							Output							***	
 			*******************************************************************/
 				
-				Date currentDate = new Date();					
-				if(name[task].contains(".")){
-					filePrefix = name[task].substring(0,name[task].lastIndexOf(".")) + "_Cil";
-				}else{
-					filePrefix = name[task] + "_Cil";
-				}
-				
-				if(selectedOutputVariant.equals(outputVariant[1])){
-					//saveDate
-					filePrefix += "_" + NameDateFormatter.format(currentDate);
-				}
-				
-				filePrefix = dir[task] + filePrefix;
+				Date endDate = new Date();			
 				
 				//save metadata
 				tp1 = new TextPanel("results");
 				tp2 = new TextPanel("results w");
 				tp3 = new TextPanel("results r");
 				
-				tp1.append("Saving date:	" + FullDateFormatter.format(currentDate)
+				tp1.append("Saving date:	" + FullDateFormatter.format(endDate)
 							+ "	Starting date:	" + FullDateFormatter.format(startDate));
 				tp1.append("Image name:	" + name[task]);
 				tp1.append("");
 				tp1.append("Parameters");
 				tp1.append("	sampling rate (Hz)	" + constants.df6US.format(sampleRate));
 				tp1.append("	sliding window size for smoothing power spectrum (Hz)	" + constants.df6US.format(smoothFreq)	+	"	=	" + constants.df0.format(smoothWindowSize)	+ "	(if = 0 -> no smoothing)");
-				tp1.append("	Percent lower powers used for thresholding power spectrum	" + percentLowest);
-				tp1.append("	SD fold used for power thresholding	" + SDlimitForSpectrumBG);
 				tp1.append("	max accepted frequency for filtering (Hz)	" + constants.df6US.format(upperLimit));
 				tp1.append("	min accepted frequency for filtering (Hz)	" + constants.df6US.format(lowerLimit));
 				tp1.append("	histogram bin size (Hz)	" + constants.df6US.format(histogramBins));
@@ -869,11 +872,17 @@ public void run(String arg) {
 				
 				tp1.append("");
 				if(removeBackgroundInSpectra) {
-					tp1.append("	Remove background in power spectra - estimated parameters");
+					tp1.append("	Remove background in power spectra - parameters");
+					tp1.append("		Percent lower powers used for thresholding power spectrum	" + percentLowest);
+					tp1.append("		SD fold used for power thresholding	" + SDlimitForSpectrumBG);
+					tp1.append("	Remove background in power spectra - estimations");
 					tp1.append("		average of lower powers	" + constants.df6US.format(lowerPowerAvgSD[0]));
 					tp1.append("		standard deviation of lower powers	" + constants.df6US.format(lowerPowerAvgSD[1]));
 				}else {
 					tp1.append("	No background-removal performed!");
+					tp1.append("");
+					tp1.append("");
+					tp1.append("");
 					tp1.append("");
 					tp1.append("");
 				}
@@ -949,7 +958,7 @@ public void run(String arg) {
 				tp2.append(name[task] + appText);
 							
 				tp1.append("");
-				tp1.append("	Assembled power spectrum (APC) in entire image");
+				tp1.append("	Assembled power spectrum (APS) in entire image");
 				if(assembledPowerSpectrumFromWholeImp != null){
 					appText = "frequency (Hz)";
 					for(int i = 0; i < assembledPowerSpectrumFromWholeImp.length; i++){
@@ -1048,7 +1057,7 @@ public void run(String arg) {
 					tp3.append(name[task] + appText);
 					
 					tp1.append("");
-					tp1.append("	Assembled power spectrum (APC) in Roi");
+					tp1.append("	Assembled power spectrum (APS) in Roi");
 					if(assembledPowerSpectrumFromRoi != null){
 						appText = "frequency (Hz)";
 						for(int i = 0; i < assembledPowerSpectrumFromRoi.length; i++){
@@ -1114,7 +1123,7 @@ public void run(String arg) {
 	//		 	}
 	//			tp1.append(appText);
 				
-				addFooter(tp1, currentDate);				
+				addFooter(tp1, endDate);				
 				tp1.saveAs(filePrefix + ".txt");
 				tp2.saveAs(filePrefix + "_1w.txt");
 				if(manualROI) {
@@ -1162,33 +1171,33 @@ public void run(String arg) {
 					}
 					
 					//save these plots also as text files
-					save2DPlotAsText(rawFreqRes, 0,0, "1st freq (Hz)", filePrefix + "_f1", true, 0.0, sampleRate / 2.0, currentDate);
-					save2DPlotAsText(rawFreqRes, 2,2, "2nd freq (Hz)", filePrefix + "_f2", true, 0.0, sampleRate / 2.0, currentDate);
-					save2DPlotAsText(rawFreqRes, 1,1, "power 1", filePrefix + "_f1p", true, 0.0, Double.POSITIVE_INFINITY, currentDate);
-					save2DPlotAsText(rawFreqRes, 3,3, "power 2", filePrefix + "_f2p", true, 0.0, Double.POSITIVE_INFINITY, currentDate);
+					save2DPlotAsText(rawFreqRes, 0,0, "1st freq (Hz)", filePrefix + "_f1", true, 0.0, sampleRate / 2.0, endDate);
+					save2DPlotAsText(rawFreqRes, 2,2, "2nd freq (Hz)", filePrefix + "_f2", true, 0.0, sampleRate / 2.0, endDate);
+					save2DPlotAsText(rawFreqRes, 1,1, "power 1", filePrefix + "_f1p", true, 0.0, Double.POSITIVE_INFINITY, endDate);
+					save2DPlotAsText(rawFreqRes, 3,3, "power 2", filePrefix + "_f2p", true, 0.0, Double.POSITIVE_INFINITY, endDate);
 					if(enhancedOutput) {
-						save2DPlotAsText(rawFreqRes, 4,4, "com freq (Hz)", filePrefix + "_com", true, 0.0, sampleRate / 4.0, currentDate);
-						save2DPlotAsText(rawFreqRes, 5,5, "phase of 1st freq (rad)", filePrefix + "_ph1", true, -Math.PI, Math.PI, currentDate);
-						save2DPlotAsText(rawFreqRes, 6,6, "phase of 2nd freq (rad)", filePrefix + "_ph2", true, -Math.PI, Math.PI, currentDate);
+						save2DPlotAsText(rawFreqRes, 4,4, "com freq (Hz)", filePrefix + "_com", true, 0.0, sampleRate / 4.0, endDate);
+						save2DPlotAsText(rawFreqRes, 5,5, "phase of 1st freq (rad)", filePrefix + "_ph1", true, -Math.PI, Math.PI, endDate);
+						save2DPlotAsText(rawFreqRes, 6,6, "phase of 2nd freq (rad)", filePrefix + "_ph2", true, -Math.PI, Math.PI, endDate);
 					}
 					
-					save2DPlotAsText(corrFreqRes, 0,0, "1st freq (Hz)", filePrefix + "_f1_c", true, 0.0, sampleRate / 2.0, currentDate);
-					save2DPlotAsText(corrFreqRes, 2,2, "2nd freq (Hz)", filePrefix + "_f2_c", true, 0.0, sampleRate / 2.0, currentDate);
-					save2DPlotAsText(corrFreqRes, 1,1, "power 1", filePrefix + "_f1p_c", true, 0.0, Double.POSITIVE_INFINITY, currentDate);
-					save2DPlotAsText(corrFreqRes, 3,3, "power 2", filePrefix + "_f2p_c", true, 0.0, Double.POSITIVE_INFINITY, currentDate);
+					save2DPlotAsText(corrFreqRes, 0,0, "1st freq (Hz)", filePrefix + "_f1_c", true, 0.0, sampleRate / 2.0, endDate);
+					save2DPlotAsText(corrFreqRes, 2,2, "2nd freq (Hz)", filePrefix + "_f2_c", true, 0.0, sampleRate / 2.0, endDate);
+					save2DPlotAsText(corrFreqRes, 1,1, "power 1", filePrefix + "_f1p_c", true, 0.0, Double.POSITIVE_INFINITY, endDate);
+					save2DPlotAsText(corrFreqRes, 3,3, "power 2", filePrefix + "_f2p_c", true, 0.0, Double.POSITIVE_INFINITY, endDate);
 					if(enhancedOutput) {
-						save2DPlotAsText(corrFreqRes, 4,4, "com freq (Hz)", filePrefix + "_com_c", true, 0.0, sampleRate / 2.0, currentDate);
-						save2DPlotAsText(corrFreqRes, 5,0, "phase of 1st freq (rad)", filePrefix + "_ph1_c", true, -Math.PI, Math.PI, currentDate);
-						save2DPlotAsText(corrFreqRes, 6,2, "phase of 2nd freq (rad)", filePrefix + "_ph2_c",true, -Math.PI, Math.PI, currentDate);
+						save2DPlotAsText(corrFreqRes, 4,4, "com freq (Hz)", filePrefix + "_com_c", true, 0.0, sampleRate / 2.0, endDate);
+						save2DPlotAsText(corrFreqRes, 5,0, "phase of 1st freq (rad)", filePrefix + "_ph1_c", true, -Math.PI, Math.PI, endDate);
+						save2DPlotAsText(corrFreqRes, 6,2, "phase of 2nd freq (rad)", filePrefix + "_ph2_c",true, -Math.PI, Math.PI, endDate);
 					}
 					
 					if(enhancedOutput) {
 						if(manualROI) {
-							save2DPlotAsTextMasked(phaseMapRoiFreqs,corrFreqRes, 0,0, "phase at " + locFreqs [0] + " Hz (rad)", filePrefix + "_ph_freq1_r", -Math.PI, Math.PI, currentDate);
-							save2DPlotAsTextMasked(phaseMapRoiFreqs,corrFreqRes, 1,2, "phase at " + locFreqs [1] + " Hz (rad)", filePrefix + "_ph_freq2_r", -Math.PI, Math.PI, currentDate);
+							save2DPlotAsTextMasked(phaseMapRoiFreqs,corrFreqRes, 0,0, "phase at " + locFreqs [0] + " Hz (rad)", filePrefix + "_ph_freq1_r", -Math.PI, Math.PI, endDate);
+							save2DPlotAsTextMasked(phaseMapRoiFreqs,corrFreqRes, 1,2, "phase at " + locFreqs [1] + " Hz (rad)", filePrefix + "_ph_freq2_r", -Math.PI, Math.PI, endDate);
 						}
-					save2DPlotAsTextMasked(phaseMapWholeImpFreqs,corrFreqRes, 0,0, "phase at " + locFreqs [2] + " Hz (rad)", filePrefix + "_ph_freq1_w", -Math.PI, Math.PI, currentDate);
-					save2DPlotAsTextMasked(phaseMapWholeImpFreqs,corrFreqRes, 1,2, "phase at " + locFreqs [3] + " Hz (rad)", filePrefix + "_ph_freq2_w", -Math.PI, Math.PI, currentDate);
+					save2DPlotAsTextMasked(phaseMapWholeImpFreqs,corrFreqRes, 0,0, "phase at " + locFreqs [2] + " Hz (rad)", filePrefix + "_ph_freq1_w", -Math.PI, Math.PI, endDate);
+					save2DPlotAsTextMasked(phaseMapWholeImpFreqs,corrFreqRes, 1,2, "phase at " + locFreqs [3] + " Hz (rad)", filePrefix + "_ph_freq2_w", -Math.PI, Math.PI, endDate);
 					}
 				}
 				
@@ -1213,6 +1222,7 @@ public void run(String arg) {
 					plot2DArray(xValues, yValues, "Power Spectra Background (SD)", "frequency (Hz)", "SD of background power (dB)", filePrefix + "_bg_sd", true, new String[]{""});
 				}
 				
+				double addLines []; String addLinesLabels [];
 				if(assembledPowerSpectrumFromWholeImp != null){
 					for(int i = 0; i < xValues.length; i++){
 						if(assembledPowerSpectrumFromWholeImp[i] != 0.0) {
@@ -1221,13 +1231,21 @@ public void run(String arg) {
 							yValues [0][i] = 0.0;
 						}
 				 	}
-					plot2DArray(xValues, yValues, "Power Spectrum - entire image", "frequency (Hz)", "power (dB)", filePrefix + "_psw", true, new String[]{""});
-					
-					if(removeBackgroundInSpectra) {						
+					addLines = new double [] {wholeImpFreqs [0] * sampleRate / assembledPowerSpectrumFromWholeImp.length, wholeImpFreqs [1] * sampleRate / assembledPowerSpectrumFromWholeImp.length};
+					addLinesLabels = new String [] {"prim. freq. (APS)","sec. freq. (APS)"};
+										
+					if(removeBackgroundInSpectra) {				
+						plot2DArray(xValues, yValues, "Power Spectrum - entire image", "frequency (Hz)", "power (dB)", filePrefix + "_psw",
+								true, new String[]{"APS"});
+						
 						for(int i = 0; i < xValues.length; i++){
 							yValues [0][i] = Math.log10(assembledPowerSpectrumFromWholeImpCorr[i])*10;
 					 	}
-						plot2DArray(xValues, yValues, "Power Spectrum - entire image", "frequency (Hz)", "corrected power (dB)", filePrefix + "_psw_c", true, new String[]{""});
+						plot2DArrayWithAdditionalLines(xValues, yValues, "Power Spectrum - entire image", "frequency (Hz)", "corrected power (dB)", filePrefix + "_psw_c",
+								true, new String[]{"corr. APS"}, addLines, addLinesLabels);
+					}else {
+						plot2DArrayWithAdditionalLines(xValues, yValues, "Power Spectrum - entire image", "frequency (Hz)", "power (dB)", filePrefix + "_psw",
+								true, new String[]{"APS"}, addLines, addLinesLabels);
 					}
 				}			
 				
@@ -1235,13 +1253,22 @@ public void run(String arg) {
 					for(int i = 0; i < xValues.length; i++){
 						yValues [0][i] = Math.log10(assembledPowerSpectrumFromRoi[i])*10;
 				 	}
-					plot2DArray(xValues, yValues, "Power Spectrum - entire roi", "frequency (Hz)", "power (dB)", filePrefix + "_psr", true, new String[]{""});	
+					addLines = new double [] {roiFreqs [0] * sampleRate / assembledPowerSpectrumFromRoi.length, roiFreqs [1] * sampleRate / assembledPowerSpectrumFromRoi.length};
+					addLinesLabels = new String [] {"prim. freq. (Roi PS)","sec. freq. (Roi PS)"};
 					
-					if(removeBackgroundInSpectra) {						
+					if(removeBackgroundInSpectra) {	
+						plot2DArray(xValues, yValues, "Power Spectrum - entire roi", "frequency (Hz)", "power (dB)", filePrefix + "_psr",
+								true, new String[]{""});	
+						
 						for(int i = 0; i < xValues.length; i++){
 							yValues [0][i] = Math.log10(assembledPowerSpectrumFromRoiCorr[i])*10;
 					 	}
-						plot2DArray(xValues, yValues, "Power Spectrum - entire roi", "frequency (Hz)", "corrected power (dB)", filePrefix + "_psr_c", true, new String[]{""});
+						plot2DArrayWithAdditionalLines(xValues, yValues, "Power Spectrum - entire roi", "frequency (Hz)", "corrected power (dB)", filePrefix + "_psr_c",
+								true, new String[]{"Roi PS"}, addLines, addLinesLabels);
+					}else {
+						plot2DArrayWithAdditionalLines(xValues, yValues, "Power Spectrum - entire roi", "frequency (Hz)", "power (dB)", filePrefix + "_psr",
+								true, new String[]{"Roi PS"}, addLines, addLinesLabels);	
+						
 					}
 				}
 				
@@ -1293,10 +1320,11 @@ public void run(String arg) {
 /**
  * No longer needed to be added to output main text file from version v0.3.0 on.
  * @deprecated
+ * 	//TODO remove?
  * */
 private void addDetailedFrequencyMaps(TextPanel tp1, ImagePlus imp, boolean signalPostCorr [][], double corrFreqRes [][][]) {
 	String appText;
-	tp1.append("Detailed results");	//TODO remove
+	tp1.append("Detailed results");
 	tp1.append("	Primary Frequency (in Hz, post filtering)");
 	for(int y = 0; y < imp.getHeight(); y++){
 		appText = "";
@@ -2648,16 +2676,21 @@ private static void convertToRGB(ImagePlus imp){
 }
 
 /**
-* 1st dimension > different graphs
-* 2nd dimension > y points
+* @param array: 1st dimension > different graphs, 2nd dimension > y points
 * */
 private static void plot2DArray(double xValues [], double [][] array, String label, String xLabel, String yLabel, String savePath, boolean logarithmic, String legends []){
-	double yMax = Double.NEGATIVE_INFINITY;
-	double max;
+	double yMax = Double.NEGATIVE_INFINITY, yMin = Double.POSITIVE_INFINITY;
+	double max, min;
 	for(int i = 0; i < array.length; i++){
 		max = tools.getMaximum(array[i]);
+		min = tools.getMinimum(array[i]);
 		if(yMax < max) yMax = max;
+		if(yMin > min) yMin = min;
 	}
+	yMax += Math.abs(0.05*yMax);
+	if(yMin>0.0)	yMin = 0.0;
+	yMin -= Math.abs(0.05*yMin);
+	
 	Color c;
 	Plot p;
 	ImagePlus pImp;
@@ -2668,7 +2701,7 @@ private static void plot2DArray(double xValues [], double [][] array, String lab
 	p.setAxisYLog(logarithmic);
 	p.updateImage();
 	p.setSize(600, 400);
-	p.setLimits(0, xValues.length-1, 0.0, yMax);
+	p.setLimits(0, xValues.length-1, yMin, yMax);
 	p.updateImage();
 	for(int i = 0; i < array.length; i++){
 		c = new Color(54+(int)(i/(double)array.length*200.0), 54+(int)(i/(double)array.length*200.0), 54+(int)(i/(double)array.length*200.0));
@@ -2688,18 +2721,23 @@ private static void plot2DArray(double xValues [], double [][] array, String lab
 }
 
 /**
-* 1st dimension > different graphs
-* 2nd dimension > y points
-* TODO add array to plot vlines
-* TODO add String array to label vlines and put legend
+* @param array: 1st dimension > different graphs, 2nd dimension > y points
+* @param lines: defines an array of vertical lines to be added to the plot
+* @param linesLabels: defines an the names of the lines in a String array, to be shown in the legend
 * */
-private static void plot2DArrayWithAdditionalLines(double xValues [], double [][] array, String label, String xLabel, String yLabel, String savePath, boolean logarithmic, String legends []){
-	double yMax = Double.NEGATIVE_INFINITY;
-	double max;
+private static void plot2DArrayWithAdditionalLines(double xValues [], double [][] array, String label, String xLabel, String yLabel, String savePath, boolean logarithmic, String legends [], double lines [], String lineLabels []){
+	double yMax = Double.NEGATIVE_INFINITY, yMin = Double.POSITIVE_INFINITY;
+	double max, min;
 	for(int i = 0; i < array.length; i++){
 		max = tools.getMaximum(array[i]);
+		min = tools.getMinimum(array[i]);
 		if(yMax < max) yMax = max;
+		if(yMin > min) yMin = min;
 	}
+	yMax += Math.abs(0.05*yMax);
+	if(yMin>0.0)	yMin = 0.0;
+	yMin -= Math.abs(0.05*yMin);
+	
 	Color c;
 	Plot p;
 	ImagePlus pImp;
@@ -2710,8 +2748,18 @@ private static void plot2DArrayWithAdditionalLines(double xValues [], double [][
 	p.setAxisYLog(logarithmic);
 	p.updateImage();
 	p.setSize(600, 400);
-	p.setLimits(0, xValues.length-1, 0.0, yMax);
+	p.setLimits(0, xValues.length-1, yMin, yMax);
 	p.updateImage();
+	for(int i = 0; i < lines.length; i++) {
+		double lineX [] = new double []{lines[i], lines[i]};
+		double lineY [] = new double [] {yMin,yMax-Math.abs(0.05*yMax)};
+		
+		c = new Color(150+(int)(i/(double)array.length*100.0), 0, 150+(int)(i/(double)array.length*100.0));
+		p.setColor(c);
+		p.setLineWidth(2);
+		p.addPoints(lineX, lineY,PlotWindow.LINE);
+		legend += lineLabels [i] + " (" + df1US.format(lines [i]) + ")\n";
+	}
 	for(int i = 0; i < array.length; i++){
 		c = new Color(54+(int)(i/(double)array.length*200.0), 54+(int)(i/(double)array.length*200.0), 54+(int)(i/(double)array.length*200.0));
 		p.setColor(c);
@@ -2764,10 +2812,100 @@ private static LUT getLUT(double [][] array, boolean multiplyWith255) {
 }
 
 /**
- * TODO
+ * Saves a histogram for the @param input array, and if @param plotMedian is selected also adds a line indicating the median of the input data.
  * */
-private static double [] getHistogram(double input [], int min, int max, double binSize) {
-	//TODO
-	return new double [] {0.0,0.0};
+private void saveAsHistogram(double input [], double min, double max, double binSize, boolean logarithmic, boolean plotMedian, String header,  String xLabel, String unit, String savePath, Date currentDate) {
+	int nrOfBins = (int) (max / binSize);
+	
+	int hist [] =  new int [nrOfBins];
+	Arrays.fill(hist, 0);
+	
+	int val;
+	int excl = 0;
+	for(int i = 0; i < input.length; i++) {
+		val = (int)(input[i] / binSize);
+		if(val >= hist.length){
+			excl++;
+			continue;
+		}
+		hist [val]++;
+	}
+	if(excl>0) {
+		progress.notifyMessage("Excluded " + excl + " pixels from histogram /<" + header + "/> as they exceeded upper plotting limit", ProgressDialog.LOG);
+	}
+	
+	double xValues [] = new double [(hist.length)*2];
+	double yValues [] = new double [(hist.length)*2];
+	
+	int yMax = 0;
+	int ct = 0;
+	for(int i = 0; i < hist.length; i++) {
+		xValues [ct] = (double) (i) * binSize;
+		yValues [ct] = (double) hist [i];
+		ct ++;
+		xValues [ct] = (double) (i+1) * binSize;
+		yValues [ct] = (double) hist [i];
+		if(yValues [ct] > yMax) {
+			yMax = (int) yValues [ct];
+		}
+		ct ++;
+	}
+	yMax *= 1.2;
+	
+	Color c;
+	Plot p;
+	ImagePlus pImp;
+	String legend = "";
+	PlotWindow.noGridLines = true;
+	
+	p = new Plot("Histogram", xLabel + " [bin width: " + binSize + " " + unit + "]", "counts");
+	p.setAxisYLog(logarithmic);
+	p.updateImage();
+	p.setSize(800, 600);
+	p.setLimits(min-1*binSize, max+1*binSize, 0.0, yMax);
+	p.updateImage();
+	if(plotMedian) {
+		double median = tools.getMedian(input);
+		double medX [] = new double []{median, median};
+		double medY [] = new double [] {0.0,yMax};
+		
+		c = new Color(0, 0,255);
+		p.setColor(c);
+		p.setLineWidth(3);
+		p.addPoints(medX, medY,PlotWindow.LINE);
+		legend += "median = " + df1US.format(median) + " " + unit + "\n";
+	}
+	{
+		c = new Color(50, 50,50);
+		p.setColor(c);
+		p.setLineWidth(1);
+		p.addPoints(xValues, yValues,PlotWindow.LINE);
+		legend += "histogram";
+	}
+	
+	p.addLegend(legend);
+//	p.setLimitsToFit(true);
+	pImp = p.makeHighResolution("plot",1,true,false);
+	IJ.saveAs(pImp,"PNG",savePath + ".png");
+	pImp.changes = false;
+	pImp.close();
+	p.dispose();	
+	
+	OutputPanel = new TextPanel("Custom Plot As Text");
+	String appText = "Histogram of " + header;
+	OutputPanel.append(appText);
+	
+	appText = xLabel + " [bin width: " + binSize + " " + unit + "]"
+			+ "	Counts";
+	OutputPanel.append(appText);
+	for(int x = 0; x <xValues.length; x+=2){
+		appText = constants.df6US.format(xValues[x]+binSize/2.0) +"	" + constants.df0.format(yValues[x]);
+		OutputPanel.append(appText);
+	}
+	
+	addFooter(OutputPanel, currentDate);				
+	OutputPanel.saveAs(savePath + ".txt");
+	
+	OutputPanel = null;
 }
 }//end main class
