@@ -11,7 +11,7 @@ Note that initial versions of FreQ (v0.0.1-v0.2.3) were called "Cilility_JNH" - 
 
 All releases of this software are archived on zenodo via the DOI: <a href="https://doi.org/10.5281/zenodo.5138071"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.5138071.svg" alt="DOI"></a>. Please also view the version specific DOIs on zenodo if you aim to cite a specific version.
 
-Copyright (C) 2019-2021: Jan N. Hansen
+Copyright (C) 2019-2022: Jan N. Hansen
 
 Contacts: jan.hansen ( at ) uni-bonn.de
 
