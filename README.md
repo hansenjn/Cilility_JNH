@@ -13,7 +13,7 @@ All releases of this software are archived on zenodo via the DOI: <a href="https
 
 Copyright (C) 2019-2021: Jan N. Hansen
 
-Contacts: jan.hansen ( at ) uni-bonn.de, dwachten ( at ) uni-bonn.de
+Contacts: jan.hansen ( at ) uni-bonn.de
 
 This program was developed in the research group Biophysical Imaging, Institute of Innate Immunity, Bonn, Germany ([Lab homepage](https://www.iiibonn.de/dagmar-wachten-lab/dagmar-wachten-lab-science)).
 
