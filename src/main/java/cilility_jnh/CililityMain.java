@@ -1,6 +1,7 @@
 package cilility_jnh;
 /** ===============================================================================
 * FreQ.java Version 0.3.0
+* (This plugin was called Cilility_JNH in previous versions)
 * 
 * This program is free software; you can redistribute it and/or
 * modify it under the terms of the GNU General Public License
