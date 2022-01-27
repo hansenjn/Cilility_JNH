@@ -629,17 +629,18 @@ public void run(String arg) {
 				ctr = 0;
 			   	
 				if(manualROI) {
-					assembledPowerSpectrumFromRoi = getAssembledPowerSpectrumInRoi(imp, signalPostCorr, selections[task], smoothWindowSize);
-					
+					assembledPowerSpectrumFromRoi = getAssembledPowerSpectrumInRoi(imp, signalPostCorr, selections[task], smoothWindowSize);					
 					if(assembledPowerSpectrumFromRoi != null){
-				   		assembledPowerSpectrumFromRoiCorr = new double [assembledPowerSpectrumFromRoi.length];
+			   			if(removeBackgroundInSpectra) {
+			   				assembledPowerSpectrumFromRoiCorr = new double [assembledPowerSpectrumFromRoi.length];
+			   			}
 				   		for(int i = 0; i < assembledPowerSpectrumFromRoi.length; i++){
 				   			if(removeBackgroundInSpectra) {
 				   				assembledPowerSpectrumFromRoiCorr [i] = assembledPowerSpectrumFromRoi [i] - powerSpectrumBackground [0][i] - SDlimitForSpectrumBG * powerSpectrumBackground [1][i];
-				   				//			   		assembledPowerSpectrumFromRoiCorr [i] = assembledPowerSpectrumFromRoi [i] - powerSpectrumMinimum [i];
-				   							   		if(assembledPowerSpectrumFromRoiCorr [i] < 0.0){
-				   							   			assembledPowerSpectrumFromRoiCorr [i] = 0.0;
-				   							   		}
+			//			   		assembledPowerSpectrumFromRoiCorr [i] = assembledPowerSpectrumFromRoi [i] - powerSpectrumMinimum [i];
+						   		if(assembledPowerSpectrumFromRoiCorr [i] < 0.0){
+						   			assembledPowerSpectrumFromRoiCorr [i] = 0.0;
+						   		}
 				   			}else {
 				   				assembledPowerSpectrumFromRoiCorr [i] = assembledPowerSpectrumFromRoi [i];
 				   			}
@@ -716,7 +717,9 @@ public void run(String arg) {
 			   	wholeImpCorrSharp = new double [2];
 			    wholeImpCom = 0.0;
 				if(assembledPowerSpectrumFromWholeImp != null){
-					assembledPowerSpectrumFromWholeImpCorr = new double [assembledPowerSpectrumFromWholeImp.length];
+					if(removeBackgroundInSpectra) {
+						assembledPowerSpectrumFromWholeImpCorr = new double [assembledPowerSpectrumFromWholeImp.length];						
+					}
 					for(int i = 0; i < assembledPowerSpectrumFromWholeImp.length; i++){
 						if(removeBackgroundInSpectra) {
 							assembledPowerSpectrumFromWholeImpCorr [i] = assembledPowerSpectrumFromWholeImp [i] - powerSpectrumBackground [0][i] - SDlimitForSpectrumBG * powerSpectrumBackground [1][i];
@@ -1141,7 +1144,7 @@ public void run(String arg) {
 					save2DPlot(rawFreqRes, 1,1, "power 1", filePrefix + "_f1p", true, 0.0, Double.POSITIVE_INFINITY, "Jet");
 					save2DPlot(rawFreqRes, 3,3, "power 2", filePrefix + "_f2p", true, 0.0, Double.POSITIVE_INFINITY, "Jet");
 					if(enhancedOutput) {
-						save2DPlot(rawFreqRes, 4,4, "com freq (Hz)", filePrefix + "_com", true, lowerLimit, upperLimit, "Jet");
+						save2DPlot(rawFreqRes, 4,4, "com freq (Hz)", filePrefix + "_com", true, 0.0, sampleRate / 2.0, "Jet");
 						save2DPlot(rawFreqRes, 5,0, "phase of 1st freq (rad)", filePrefix + "_ph1", true, -Math.PI, Math.PI, "Spectrum");
 						save2DPlot(rawFreqRes, 6,2, "phase of 2nd freq (rad)", filePrefix + "_ph2",true, -Math.PI, Math.PI, "Spectrum");
 		//				save2DPlot(evMapRaw, "eigenvec ph1 (rad)", filePrefix + "_ev1", true, -Math.PI, Math.PI, "Spectrum");
@@ -1176,7 +1179,7 @@ public void run(String arg) {
 					save2DPlotAsText(rawFreqRes, 1,1, "power 1", filePrefix + "_f1p", true, 0.0, Double.POSITIVE_INFINITY, endDate);
 					save2DPlotAsText(rawFreqRes, 3,3, "power 2", filePrefix + "_f2p", true, 0.0, Double.POSITIVE_INFINITY, endDate);
 					if(enhancedOutput) {
-						save2DPlotAsText(rawFreqRes, 4,4, "com freq (Hz)", filePrefix + "_com", true, 0.0, sampleRate / 4.0, endDate);
+						save2DPlotAsText(rawFreqRes, 4,4, "com freq (Hz)", filePrefix + "_com", true, 0.0, sampleRate / 2.0, endDate);
 						save2DPlotAsText(rawFreqRes, 5,5, "phase of 1st freq (rad)", filePrefix + "_ph1", true, -Math.PI, Math.PI, endDate);
 						save2DPlotAsText(rawFreqRes, 6,6, "phase of 2nd freq (rad)", filePrefix + "_ph2", true, -Math.PI, Math.PI, endDate);
 					}
@@ -1397,7 +1400,7 @@ private void addDetailedFrequencyMaps(TextPanel tp1, ImagePlus imp, boolean sign
 }
 private void addFooter(TextPanel tp, Date currentDate){
 	tp.append("");
-	tp.append("Datafile was generated on " + FullDateFormatter2.format(currentDate) + " by '"+PLUGINNAME+"', an ImageJ plug-in by Jan Niklas Hansen (jan.hansen@uni-bonn.de). More information: " + PLUGINHTML + ".");
+	tp.append("Datafile was generated on " + FullDateFormatter2.format(currentDate) + " by '"+PLUGINNAME+"', an ImageJ plug-in by Jan Niklas Hansen (jan.hansen@uni-bonn.de). More information: " + PLUGINHTML + "");
 	tp.append("The plug-in '"+PLUGINNAME+"' is distributed in the hope that it will be useful,"
 			+ " but WITHOUT ANY WARRANTY; without even the implied warranty of"
 			+ " MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.");
@@ -1829,6 +1832,7 @@ private void save2DPlot(double [][][] output, int index3rdDim, int indexDimensio
 			if(ignoreZero && output[x][y][indexDimensionForMasking] == 0.0)	continue;
 			if(output[x][y][index3rdDim] > upperLimit)	continue;
 			if(output[x][y][index3rdDim] < lowerLimit)	continue;
+			if(Double.isNaN(output[x][y][index3rdDim]))	continue;
 	   		if(output[x][y][index3rdDim] > max){
 	   			max = output[x][y][index3rdDim]; 
 	   		}
@@ -2077,6 +2081,7 @@ public void save2DPlotAsText(double [][][] output, int index3rdDim, int refDimen
 			if(ignoreZero && output[x][y][refDimensionForMasking] == 0.0)	continue;
 			if(output[x][y][index3rdDim] > upperLimit)	continue;
 			if(output[x][y][index3rdDim] < lowerLimit)	continue;
+			if(Double.isNaN(output[x][y][index3rdDim]))	continue;
 			appText += constants.df6US.format(output [x][y][index3rdDim]);
    		}
 		OutputPanel.append(appText);
@@ -2689,8 +2694,8 @@ private static void plot2DArray(double xValues [], double [][] array, String lab
 	for(int i = 0; i < array.length; i++){
 		max = tools.getMaximum(array[i]);
 		min = tools.getMinimum(array[i]);
-		if(yMax < max) yMax = max;
-		if(yMin > min) yMin = min;
+		if(!Double.isNaN(max) && max < Double.POSITIVE_INFINITY && yMax < max) yMax = max;
+		if(!Double.isNaN(min) && min > Double.NEGATIVE_INFINITY && yMin > min) yMin = min;
 	}
 	yMax += Math.abs(0.05*yMax);
 	if(yMin>0.0)	yMin = 0.0;
@@ -2705,7 +2710,7 @@ private static void plot2DArray(double xValues [], double [][] array, String lab
 	p = new Plot(label, xLabel, yLabel);
 	p.setAxisYLog(logarithmic);
 	p.updateImage();
-	p.setSize(600, 400);
+	p.setSize(1000, 700);
 	p.setLimits(xMin, xMax, yMin, yMax);
 	p.updateImage();
 	for(int i = 0; i < array.length; i++){
@@ -2741,8 +2746,8 @@ private static void plot2DArrayWithAdditionalLines(double xValues [], double [][
 	for(int i = 0; i < array.length; i++){
 		max = tools.getMaximum(array[i]);
 		min = tools.getMinimum(array[i]);
-		if(yMax < max) yMax = max;
-		if(yMin > min) yMin = min;
+		if(!Double.isNaN(max) && max < Double.POSITIVE_INFINITY && yMax < max) yMax = max;
+		if(!Double.isNaN(min) && min > Double.NEGATIVE_INFINITY && yMin > min) yMin = min;
 	}
 	yMax += Math.abs(0.05*yMax);
 	if(yMin>0.0)	yMin = 0.0;
@@ -2757,12 +2762,12 @@ private static void plot2DArrayWithAdditionalLines(double xValues [], double [][
 	p = new Plot(label, xLabel, yLabel);
 	p.setAxisYLog(logarithmic);
 	p.updateImage();
-	p.setSize(600, 400);
+	p.setSize(1000, 700);
 	p.setLimits(xMin, xMax, yMin, yMax);
 	p.updateImage();
 	for(int i = 0; i < lines.length; i++) {
 		double lineX [] = new double []{lines[i], lines[i]};
-		double lineY [] = new double [] {yMin,yMax-Math.abs(0.05*yMax)};
+		double lineY [] = new double [] {yMin - Math.abs(0.025*yMin),yMax-Math.abs(0.025*yMax)};
 		
 		c = new Color(150+(int)(i/(double)array.length*100.0), 0, 150+(int)(i/(double)array.length*100.0));
 		p.setColor(c);
@@ -2871,7 +2876,7 @@ private void saveAsHistogram(double input [], double min, double max, double bin
 	p = new Plot("Histogram", xLabel + " [bin width: " + binSize + " " + unit + "]", "counts");
 	p.setAxisYLog(logarithmic);
 	p.updateImage();
-	p.setSize(800, 600);
+	p.setSize(1000, 700);
 	p.setLimits(min-1*binSize, max+1*binSize, 0.0, yMax);
 	p.updateImage();
 	if(plotMedian) {
