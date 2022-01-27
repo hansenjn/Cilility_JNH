@@ -9,14 +9,14 @@
 		<relativePath />
 	</parent> 
  
- 	<artifactId>Cilility_JNH</artifactId>  
+ 	<artifactId>FreQ_</artifactId>  
  	<groupId>JNH</groupId>
     <version>0.3.0-SNAPSHOT</version>
  
 <!-- Plugin Information -->
-    <name>Cilility</name>
- 	<description>An ImageJ plugin to analyze ciliary beating from time-lapse 2D images of multi-ciliated cells, e.g. acquired with a bright-field or phase-contrast microscope.</description>    
- 	<url>https://github.com/hansenjn/Cilility_JNH</url>
+    <name>FreQ</name>
+ 	<description>An ImageJ plugin to analyze ciliary beating from time-lapse 2D images of multi-ciliated cells, e.g. acquired with a bright-field or phase-contrast microscope. Previously, this plugin was called Cilility_JNH.</description>    
+ 	<url>https://github.com/hansenjn/FreQ</url>
 	<inceptionYear>2019</inceptionYear>
 	<organization>
 		<name>JNH</name>
@@ -28,7 +28,7 @@
 		<package-name>cilility_jnh</package-name>
 		<license.licenseName>gpl_v3</license.licenseName>
 		<license.copyrightOwners>Jan Niklas Hansen.</license.copyrightOwners>
-		<license.projectName>Cilility_JNH</license.projectName>
+		<license.projectName>FreQ</license.projectName>
 	</properties>
 		
 	<licenses>
@@ -76,15 +76,15 @@
 	</mailingLists>
  	
  	<scm>
-		<connection>scm:git:git://github.com/hansenjn/Cilility_JNH</connection>
-		<developerConnection>scm:git:git@github.com:hansenjn/Cilility_JNH</developerConnection>
+		<connection>scm:git:git://github.com/hansenjn/FreQ</connection>
+		<developerConnection>scm:git:git@github.com:hansenjn/FreQ</developerConnection>
 		<tag>HEAD</tag>
-		<url>https://github.com/hansenjn/Cilility_JNH</url>
+		<url>https://github.com/hansenjn/FreQ</url>
 	</scm>
  	
  	<issueManagement>
 		<system>GitHub Issues</system>
-		<url>https://github.com/hansenjn/Cilility_JNH/issues</url>
+		<url>https://github.com/hansenjn/FreQ/issues</url>
 	</issueManagement>
  	
  	<ciManagement>
@@ -116,7 +116,7 @@
 			<plugin>
 				<artifactId>maven-jar-plugin</artifactId>
 				<configuration>
-					<projectName>Cilility_JNH plugin for ImageJ.</projectName>
+					<projectName>FreQ plugin for ImageJ.</projectName>
 					<organizationName>Jan Niklas Hansen</organizationName>
 					<descriptorRefs>
             			<descriptorRef>jar-with-dependencies</descriptorRef>

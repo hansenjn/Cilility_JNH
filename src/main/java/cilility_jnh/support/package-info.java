@@ -23,7 +23,7 @@ GNU General Public License for more details.
 
 See the GNU General Public License for more details.
 
-Copyright (C) 2016-2021 Jan N Hansen 
+Copyright (C) 2016-2022 Jan N Hansen 
   
 For any questions please feel free to contact me (jan.hansen@uni-bonn.de).
 **/

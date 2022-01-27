@@ -1,6 +1,6 @@
 package cilility_jnh;
 /** ===============================================================================
-* Cilility_JNH.java Version 0.3.0
+* FreQ.java Version 0.3.0
 * 
 * This program is free software; you can redistribute it and/or
 * modify it under the terms of the GNU General Public License
@@ -14,7 +14,7 @@ package cilility_jnh;
 * See the GNU General Public License for more details.
 *  
 * Copyright (C) Jan Niklas Hansen
-* Date: June 13, 2019 (This Version: January 17, 2022)
+* Date: June 13, 2019 (This Version: January 27, 2022)
 *   
 * For any questions please feel free to contact me (jan.hansen@uni-bonn.de).
 * =============================================================================== */
@@ -38,9 +38,9 @@ import ij.text.*;
 
 public class CililityMain implements PlugIn, Measurements {
 	//Name variables
-	static final String PLUGINNAME = "Cilility_JNH";
+	static final String PLUGINNAME = "FreQ";
 	static final String PLUGINVERSION = "0.3.0";
-	
+	static final String PLUGINHTML = "https://github.com/hansenjn/FreQ";
 	//Fix fonts
 	static final Font SuperHeadingFont = new Font("Sansserif", Font.BOLD, 16);
 	static final Font HeadingFont = new Font("Sansserif", Font.BOLD, 14);
@@ -1397,7 +1397,7 @@ private void addDetailedFrequencyMaps(TextPanel tp1, ImagePlus imp, boolean sign
 }
 private void addFooter(TextPanel tp, Date currentDate){
 	tp.append("");
-	tp.append("Datafile was generated on " + FullDateFormatter2.format(currentDate) + " by '"+PLUGINNAME+"', an ImageJ plug-in by Jan Niklas Hansen (jan.hansen@uni-bonn.de).");
+	tp.append("Datafile was generated on " + FullDateFormatter2.format(currentDate) + " by '"+PLUGINNAME+"', an ImageJ plug-in by Jan Niklas Hansen (jan.hansen@uni-bonn.de). More information: " + PLUGINHTML + ".");
 	tp.append("The plug-in '"+PLUGINNAME+"' is distributed in the hope that it will be useful,"
 			+ " but WITHOUT ANY WARRANTY; without even the implied warranty of"
 			+ " MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.");
