@@ -634,9 +634,7 @@ public void run(String arg) {
 				if(manualROI) {
 					assembledPowerSpectrumFromRoi = getAssembledPowerSpectrumInRoi(imp, signalPostCorr, selections[task], smoothWindowSize);					
 					if(assembledPowerSpectrumFromRoi != null){
-			   			if(removeBackgroundInSpectra) {
-			   				assembledPowerSpectrumFromRoiCorr = new double [assembledPowerSpectrumFromRoi.length];
-			   			}
+			   			assembledPowerSpectrumFromRoiCorr = new double [assembledPowerSpectrumFromRoi.length];
 				   		for(int i = 0; i < assembledPowerSpectrumFromRoi.length; i++){
 				   			if(removeBackgroundInSpectra) {
 				   				assembledPowerSpectrumFromRoiCorr [i] = assembledPowerSpectrumFromRoi [i] - powerSpectrumBackground [0][i] - SDlimitForSpectrumBG * powerSpectrumBackground [1][i];
@@ -720,9 +718,7 @@ public void run(String arg) {
 			   	wholeImpCorrSharp = new double [2];
 			    wholeImpCom = 0.0;
 				if(assembledPowerSpectrumFromWholeImp != null){
-					if(removeBackgroundInSpectra) {
-						assembledPowerSpectrumFromWholeImpCorr = new double [assembledPowerSpectrumFromWholeImp.length];						
-					}
+					assembledPowerSpectrumFromWholeImpCorr = new double [assembledPowerSpectrumFromWholeImp.length];	
 					for(int i = 0; i < assembledPowerSpectrumFromWholeImp.length; i++){
 						if(removeBackgroundInSpectra) {
 							assembledPowerSpectrumFromWholeImpCorr [i] = assembledPowerSpectrumFromWholeImp [i] - powerSpectrumBackground [0][i] - SDlimitForSpectrumBG * powerSpectrumBackground [1][i];
