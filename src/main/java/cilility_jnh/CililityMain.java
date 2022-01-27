@@ -173,6 +173,8 @@ public void run(String arg) {
 	gd.setInsets(0, 0, 0);	gd.addNumericField("Bin size in histograms (Hz)", histogramBins, 2);
 	gd.setInsets(0, 0, 0);	gd.addCheckbox("Output complex maps (phase, com, ...)", enhancedOutput);
 	gd.setInsets(0,0,0);	gd.addChoice("Output file names ", outputVariant, selectedOutputVariant);
+	
+	gd.addHelp(PLUGINHTML);
 	gd.showDialog();
 	//show Dialog-----------------------------------------------------------------
 
