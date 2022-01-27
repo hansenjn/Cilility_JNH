@@ -9,7 +9,7 @@ An ImageJ plugin to analyze ciliary beating from time-lapse 2D images of multi-c
 
 Note that initial versions of FreQ (v0.0.1-v0.2.3) were called "Cilility_JNH" - From v0.3.0 on, the plugin is called FreQ.
 
-All releases of this software are archived on zenodo via the DOI: <a href="https://doi.org/10.5281/zenodo.5138072"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.5138071.svg" alt="DOI"></a>. Please also view the version specific DOIs on zenodo if you aim to cite a specific version.
+All releases of this software are archived on zenodo via the DOI: <a href="https://doi.org/10.5281/zenodo.5138071"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.5138071.svg" alt="DOI"></a>. Please also view the version specific DOIs on zenodo if you aim to cite a specific version.
 
 Copyright (C) 2019-2021: Jan N. Hansen
 
