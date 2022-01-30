@@ -2,7 +2,7 @@
 <i>If you are not viewing this readme file on the main github repository for FreQ (https://github.com/hansenjn/FreQ), please visit the main github repository to view the latest information on the plugin.</i>
 </p>
 
-# FreQ
+# ![FreQ](https://github.com/hansenjn/FreQ/blob/master/FreQ%20Logo%20Small.png?raw=true)
 (previously called **Cilility_JNH**)
 
 An ImageJ plugin to analyze ciliary beating from pixel intensity oscillations in time-lapse 2D images of multi-ciliated cells, e.g. acquired with a bright-field or phase-contrast microscope. Download the latest release [here](https://github.com/hansenjn/FreQ/releases).
