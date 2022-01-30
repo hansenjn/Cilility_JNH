@@ -22,7 +22,7 @@ The newly developed software is licensed under GNU General Public License v3.0. 
 - edu.emory.mathcs.jtransforms.fft\DoubleFFT_1D.java & edu.emory.mathcs.utils\ConcurrencyUtils.java (MPL 1.1/GPL 2.0/LGPL 2.1, Mozilla Public License Version 1.1, author: Piotr Wendykier)
 
 ## Plugin description
-This ImageJ plugin extracts periodic changes of pixel intensity evoked by ciliary beating. These periodic changes are further analyzed using a Fast Fourier Transformation. Among other parameters the plugin determines the ciliary beat frequency.
+This ImageJ plugin extracts periodic changes of pixel intensity, such as those evoked by ciliary beating. These periodic changes are further analyzed using a Fast Fourier Transformation. Among other parameters the plugin determines the (ciliary beat) frequency.
 
 More descriptions on the underlying algorithms and output parameters will soon be made available here in the [main FreQ github repository](https://github.com/hansenjn/FreQ/).
 
