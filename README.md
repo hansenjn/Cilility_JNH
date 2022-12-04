@@ -23,8 +23,6 @@ Jeong I, Hansen JN, Wachten D, Jurisch-Yaksi N. Measurement of ciliary beating a
 
 The underlying analysis methods were inspired by the MATLAB-based analysis presented in [Olstad et al., Curr. Biol, 2019](https://doi.org/10.1016/j.cub.2018.11.059), and [D'Gama et al., Cell Rep. 2021](https://doi.org/10.1016/j.celrep.2021.109775).
 
-More descriptions on the underlying algorithms and output parameters are also planned to be available here soon.
-
 ## How to use the FreQ plugin?
 ### Installing FreQ
 FreQ is a plugin for the open-source software ImageJ and thus, requires the installation of ImageJ to your computer ([Download page for ImageJ](https://imagej.net/Downloads)). If you aim to directly analyze microscopy file formats, you may consider installing FIJI instead ([Download page for FIJI](https://fiji.sc/)). FIJI is an ImageJ program with preinstalled plugins, also including a plugin to read images directly from microscopy files (e.g. image files ending with .nd2, .czi, or .lif). 
