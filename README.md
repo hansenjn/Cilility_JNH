@@ -26,6 +26,90 @@ The underlying analysis methods were inspired by the MATLAB-based analysis prese
 More descriptions on the underlying algorithms and output parameters are also planned to be available here soon.
 
 ## How to use the FreQ plugin?
+### Installing FreQ
+FreQ is a plugin for the open-source software ImageJ and thus, requires the installation of ImageJ to your computer ([Download page for ImageJ](https://imagej.net/Downloads)). If you aim to directly analyze microscopy file formats, you may consider installing FIJI instead ([Download page for FIJI](https://fiji.sc/)). FIJI is an ImageJ program with preinstalled plugins, also including a plugin to read images directly from microscopy files (e.g. image files ending with .nd2, .czi, or .lif). 
+
+FreQ can be installed either (A) via the Update Manager in FIJI (recommend) or (B) manually (if you don't have internet access fromy our FIJI/ImageJ2 or use the basic ImageJ installation, which does not contain the update manager).
+
+#### (A) Installing FreQ via the Update Manager
+Since December 2022, FreQ can be simply installed through FIJIs update manager. This also ensures that you always get the latest FreQ release when you update your FIJI / ImageJ2. Pursue the installation as follows:
+
+- Go to the menu entry Help > Update in your FIJI. 
+<p align="center">
+   <img src="https://user-images.githubusercontent.com/27991883/205484552-b4161f8d-e4e6-4513-8d20-a5f5f3791cf6.png" width=400>
+</p>
+
+- A dialog pops up that loads update site information - wait for it to complete.
+<p align="center">
+   <img src="https://user-images.githubusercontent.com/27991883/205484622-704c0546-ae06-4858-8b0d-89be969f5770.png" width=300>
+</p>
+
+- When it completed it will automatically close and open the following dialog (note that if you haven't updated your FIJI for a long time here may be a lot of updates listed - this is no problem you can just update everything along with installing FreQ so just continue with the following descriptions).
+
+<p align="center">
+   <img src="https://user-images.githubusercontent.com/27991883/205484704-8786306c-7ce0-41d0-8967-167a7c461cbc.png" width=500>
+</p>
+
+- Press OK in the "Your ImageJ is up to date"-message (if the message is displayed)
+
+- Click "Manage Update Sites". This will open another dialog, in which you need to check the FreQ update site (you find it by scrolling down). Afterwards, press "Close".
+
+<p align="center">
+   <img src="https://user-images.githubusercontent.com/27991883/205503857-49af2074-c168-49fb-bfd1-a1df40e5d20d.png" width=600>
+</p>
+
+- Now, in the original update dialog you will see new modules added for installation. Click "apply changes".
+
+<p align="center">
+   <img src="https://user-images.githubusercontent.com/27991883/205503885-5ad61c78-bc9a-4939-b2b0-7b76e3f7f410.png" width=400>
+</p>
+
+- The installation process may take some time, depending on the download speed. The installation process terminates with the following dialog:
+<p align="center">
+   <img src="https://user-images.githubusercontent.com/27991883/205484904-7c6cc745-28d9-449e-8c8d-8bae4bb064c7.png" width=400>
+</p>
+
+- Close FIJI and restart FIJI. 
+
+- You can now verify that FreQ is installed: Verify that the menu entry Plugins > JNH > FreQ is available.
+
+<p align="center">
+   <img src="https://user-images.githubusercontent.com/27991883/205504065-7c6a17ee-4586-43d4-8ebf-b227d268f2fc.png" width=450>
+</p>
+
+
+#### (B) Installing FreQ to a pure ImageJ / installing FreQ manually
+Use these installation instructions if ...
+- you use a pure ImageJ, which does not include the update manager
+- you cannot access the internet from your FIJI/ImageJ distribution
+- you do not want to use the update manager
+
+Perform the installation as follows:
+- Download the FreQ plugins (only the .jar files are needed) from the latest release at the [release page](https://github.com/hansenjn/FreQ/releases).
+
+<p align="center">
+   <img src="https://user-images.githubusercontent.com/27991883/205504139-b05bc773-e2dc-4179-bc84-4730337e2667.PNG" width=500>
+</p>
+
+- Launch ImageJ and install the plugins by drag and drop into the ImageJ window (red marked region in the screenshot below) 
+<p align="center">
+   <img src="https://user-images.githubusercontent.com/27991883/201358020-c3685947-b5d8-4127-88ec-ce9b4ddf0e56.png" width=500>
+</p>
+
+- Confirm the installations by pressing save in the upcoming dialog(s).
+<p align="center">
+   <img src="https://user-images.githubusercontent.com/27991883/205504205-30fb80b0-cae0-4988-8fac-a87b3ae2210f.png" width=500>
+</p>
+
+- Next, ImageJ requires to be restarted (close it and start it again)
+
+- You can now verify that FreQ is installed: Verify that the menu entry Plugins > JNH > FreQ is available.
+
+<p align="center">
+   <img src="https://user-images.githubusercontent.com/27991883/205504065-7c6a17ee-4586-43d4-8ebf-b227d268f2fc.png" width=450>
+</p>
+
+### Applying / Using FreQ
 For more information, please see the STAR protocol describing application of FreQ to study the ciliary beating in the zebrafish:
 https://doi.org/10.1016/j.xpro.2022.101542
 
@@ -34,9 +118,6 @@ Jeong I, Hansen JN, Wachten D, Jurisch-Yaksi N. Measurement of ciliary beating a
 We are planning to make available a more comprehensive user guide soon here.
 
 For any questions or more detailed information, please contact jan.hansen(at)uni-bonn.de
-
-### Software requirements
-FreQ is a plugin for the open-source software ImageJ and thus, requires the installation of ImageJ to your computer ([Download page for ImageJ](https://imagej.net/Downloads)). If you aim to directly analyze microscopy file formats, you may consider installing FIJI instead ([Download page for FIJI](https://fiji.sc/)). FIJI is an ImageJ program with preinstalled plugins, also including a plugin to read images directly from microscopy files (e.g. image files ending with .nd2, .czi, or .lif).
 
 ## How to cite the FreQ plugin?
 Please acknoledge the methodology of the analysis by citing the following protocol:
@@ -52,8 +133,9 @@ The zenodo archive also allows to cite/refer a very specific software version th
 
 ## Staying up-to-date
 The most recent information and latest updates on the software are available through the main github repository for FreQ: 
-https://github.com/hansenjn/FreQ.
+https://github.com/hansenjn/FreQ. 
 
+If you install FreQ via the update manager in FIJI (see above), with every update of FIJI your FreQ version will be updated as well (in case a newer release fo FreQ is available).
 
 ## LICENSE NOTES
 The newly developed software is licensed under GNU General Public License v3.0. However, this software includes packages derived from others, for which different licenses may apply. The different licenses and the authors of theses code parts are clearly stated in the headers of the respective classes. This applies to the following packages\classes:
