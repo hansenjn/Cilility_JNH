@@ -9,7 +9,7 @@ An ImageJ plugin to analyze pixel intensity oscillations in time-lapse 2D images
 
 Note that initial versions of FreQ (v0.0.1-v0.2.3) were called "Cilility_JNH" - From v0.3.0 on, the plugin is called FreQ.
 
-Copyright (C) 2019-2022: Jan N. Hansen
+Copyright (C) 2019-2023: Jan N. Hansen
 
 Contacts: jan.hansen ( at ) uni-bonn.de
 
