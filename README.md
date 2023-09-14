@@ -118,7 +118,7 @@ We are planning to make available a more comprehensive user guide soon here.
 For any questions or more detailed information, please contact jan.hansen(at)uni-bonn.de
 
 ## How to cite the FreQ plugin?
-Please acknoledge the methodology of the analysis by citing the following protocol:
+Please acknowledge the methodology of the analysis by citing the following protocol:
 
 Jeong I, Hansen JN, Wachten D, Jurisch-Yaksi N. Measurement of ciliary beating and fluid flow in the zebrafish adult telencephalon. STAR Protoc. 2022 Jul 15;3(3):101542. doi: [10.1016/j.xpro.2022.101542](https://doi.org/10.1016/j.celrep.2021.109775).
 
